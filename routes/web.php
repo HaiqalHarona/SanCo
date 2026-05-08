@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Livewire\Volt\Volt;
+use Livewire\Volt\Volt; 
 use App\Http\Controllers\SocialController;
 
 Volt::route('/', 'auth')->name('auth');
