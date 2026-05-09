@@ -126,7 +126,7 @@ new class extends Component {
 
         return $masterKey;
     }
-
+    
     /**
      *
      */

@@ -14,15 +14,13 @@
         cropper: null,
         showCropModal: false,
     
-        // --- SECURITY DATA ---
+        // --- SECURITY DATA (STATIC PLACEHOLDER) ---
         recoveryKey: '',
         isKeyVisible: false,
         keyCopied: false,
     
         initData() {
-            // Load the recovery key from local storage when settings open
-            let userId = '{{ auth()->id() }}';
-            this.recoveryKey = localStorage.getItem('e2e_recovery_' + userId) || '';
+            // Stripped out dynamic loading. Only using the placeholder above for UI testing.
         },
     
         initCropper(imageElement) {
@@ -76,13 +74,6 @@
             navigator.clipboard.writeText(this.recoveryKey);
             this.keyCopied = true;
             setTimeout(() => this.keyCopied = false, 2000);
-        },
-    
-        generateNewRecoveryKey() {
-            // Temporary Mock just to test the UI toggle and copy functionality!
-            let mockKey = 'abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual';
-            this.recoveryKey = mockKey;
-            this.isKeyVisible = true;
         }
     }" x-init="initData()" x-cloak>
 
@@ -176,31 +167,82 @@
 
                 <div
                     class="bg-gray-50 dark:bg-[#18181b] border border-gray-200 dark:border-white/10 p-5 rounded-2xl space-y-4">
+
                     <div class="flex justify-between items-center mb-2">
-                        <label
-                            class="text-[12px] font-bold text-gray-500 dark:text-[#a1a1aa] uppercase tracking-wider">Master
-                            Recovery Key</label>
-                        <span x-show="recoveryKey"
-                            class="px-2 py-1 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 text-[10px] font-bold uppercase rounded-md">Active</span>
+                        <label class="text-[12px] font-bold text-gray-500 dark:text-[#a1a1aa] uppercase tracking-wider">
+                            Master Recovery Key
+                        </label>
+
+                        <div class="flex items-center gap-3">
+                            <div x-show="recoveryKey" x-cloak wire:ignore
+                                class="flex items-center gap-1 bg-gray-100 dark:bg-[#2a2a2d] rounded-lg p-1 border border-gray-200 dark:border-white/10 shadow-sm">
+
+                                <button type="button" @click="isKeyVisible = !isKeyVisible"
+                                    class="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">
+                                    {{-- Eye Closed Icon (When Visible) --}}
+                                    <svg x-show="isKeyVisible" x-cloak class="w-4 h-4" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21">
+                                        </path>
+                                    </svg>
+                                    {{-- Eye Open Icon (When Hidden) --}}
+                                    <svg x-show="!isKeyVisible" class="w-4 h-4" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                        </path>
+                                    </svg>
+                                </button>
+
+                                <button type="button" @click="copyRecoveryKey()"
+                                    class="p-1.5 text-gray-500 hover:text-pink-500 dark:text-gray-400 dark:hover:text-pink-500 transition"
+                                    title="Copy to clipboard">
+                                    <svg x-show="!keyCopied" class="w-4 h-4" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                        </path>
+                                    </svg>
+                                    <svg x-show="keyCopied" x-cloak class="w-4 h-4 text-emerald-500" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {{-- Status Badge --}}
+                            @if (auth()->user()->master_key)
+                                <span
+                                    class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                    Active
+                                </span>
+                            @else
+                                <span
+                                    class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                    Not Setup
+                                </span>
+                            @endif
+                        </div>
                     </div>
 
-                    {{-- MASKED MULTILINE PHRASE BOX (Protected by wire:ignore) --}}
+                    {{-- MASKED MULTILINE PHRASE BOX (Cleaned Up) --}}
                     <div class="relative w-full" wire:ignore>
-
-                        {{-- Added 'overflow-hidden' here to strictly enforce bounds --}}
                         <div class="w-full bg-white dark:bg-[#1e1e21] border border-gray-200 dark:border-white/10 rounded-xl p-6 md:px-8 text-center font-mono text-gray-900 dark:text-pink-500 shadow-sm dark:shadow-inner transition-all duration-300 flex items-center justify-center min-h-[140px] overflow-hidden"
                             :class="{ 'opacity-50': !recoveryKey }">
 
                             {{-- The actual text container --}}
                             <div x-show="recoveryKey" class="w-full max-w-full transition-all duration-300" x-cloak>
-
-                                {{-- HIDDEN STATE: Added 'break-all', 'w-full', and 'leading-relaxed' so the dots wrap safely --}}
+                                {{-- HIDDEN STATE --}}
                                 <p x-show="!isKeyVisible"
                                     class="text-xl md:text-2xl tracking-[0.2em] md:tracking-[0.25em] select-none opacity-60 mt-1 break-all w-full leading-relaxed">
-                                    ••••••••••••••••••••••••
+                                    •••••••••••••••
                                 </p>
 
-                                {{-- REVEALED STATE: Show the 24 words --}}
+                                {{-- REVEALED STATE --}}
                                 <p x-show="isKeyVisible"
                                     class="text-[14px] md:text-[15px] leading-loose select-all break-words w-full"
                                     x-text="recoveryKey"></p>
@@ -212,61 +254,7 @@
                                 NO KEY FOUND
                             </p>
                         </div>
-
-                        {{-- Floating Control Buttons --}}
-                        <div
-                            class="absolute top-3 right-3 flex items-center gap-1 bg-gray-100/90 dark:bg-[#2a2a2d]/80 backdrop-blur-md rounded-lg p-1 border border-gray-200 dark:border-white/10 shadow-sm z-10">
-
-                            <button type="button" @click="isKeyVisible = !isKeyVisible" :disabled="!recoveryKey"
-                                class="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-50 transition">
-
-                                {{-- Eye Closed Icon (When Visible) --}}
-                                <svg x-show="isKeyVisible" x-cloak class="w-4 h-4" fill="none"
-                                    stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21">
-                                    </path>
-                                </svg>
-
-                                {{-- Eye Open Icon (When Hidden) --}}
-                                <svg x-show="!isKeyVisible" class="w-4 h-4" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
-                                    </path>
-                                </svg>
-                            </button>
-
-                            <button type="button" @click="copyRecoveryKey()" :disabled="!recoveryKey"
-                                class="p-2 text-gray-500 hover:text-pink-500 dark:text-gray-400 dark:hover:text-pink-500 disabled:opacity-50 transition"
-                                title="Copy to clipboard">
-                                <svg x-show="!keyCopied" class="w-4 h-4" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
-                                    </path>
-                                </svg>
-                                <svg x-show="keyCopied" x-cloak class="w-4 h-4 text-emerald-500" fill="none"
-                                    stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M5 13l4 4L19 7"></path>
-                                </svg>
-                            </button>
-                        </div>
                     </div>
-                </div>
-
-                <div class="pt-4 border-t border-gray-200 dark:border-white/10">
-                    <h4 class="text-[12px] font-bold text-red-500 uppercase tracking-wider mb-3">Danger Zone</h4>
-                    <button type="button" @click="generateNewRecoveryKey()"
-                        class="w-full py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-bold border border-red-500/20 transition-colors">
-                        Generate New Recovery Key
-                    </button>
-                    <p class="text-[11px] text-gray-500 dark:text-[#71717a] mt-3 text-center leading-relaxed">
-                        Generating a new key will permanently disconnect your current E2EE session. Other devices will
-                        lose access to chats until restored.</p>
                 </div>
             </div>
 
