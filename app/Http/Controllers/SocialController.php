@@ -47,7 +47,7 @@ class SocialController extends Controller
                         'name' => $user->getName(),
                         'avatar' => $user->getAvatar(),
                         'user_tag' => $this->generateUniqueTag('SanCo'),
-                        'master_key' => bcrypt($masterKey)
+                        'master_key' => bcrypt($masterKey),
                     ]
                 );
             } elseif ($provider == 'github') {
@@ -62,7 +62,7 @@ class SocialController extends Controller
                         'email' => $user->getEmail(),
                         'avatar' => $user->getAvatar(),
                         'user_tag' => $this->generateUniqueTag('SanCo'),
-                        'master_key' => bcrypt($masterKey)
+                        'master_key' => bcrypt($masterKey),
                     ]
                 );
             }
@@ -70,7 +70,11 @@ class SocialController extends Controller
             if ($appUser) {
                 Auth::login($appUser);
 
-                return redirect()->route('messenger')->with('success', 'Welcome '.$appUser->name);
+                if ($appUser->wasRecentlyCreated) {
+                    return redirect()->route('setup.master-key')->with('master_key', $masterKey)
+                    ->with('success', 'Account Created, Save your recovery phrase now');
+                }
+                return redirect()->route('messenger')->with('success', 'Welcome '. $appUser->name);
             }
 
             return redirect()->route('auth')->with('error', 'Authentication provider not recognized.');
