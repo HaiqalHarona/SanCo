@@ -23,13 +23,6 @@
             this.copied = true;
             setTimeout(() => this.copied = false, 2500); // Resets the icon after 2.5s
         }
-    
-        init() {
-            let userId = '{{ auth()->id() }}';
-            if (this.key) {
-                localStorage.setItem('recovery_key' + userId, this.key);
-            }
-        }
     }"
         class="max-w-xl w-full bg-[#18181b] rounded-3xl p-8 md:p-10 text-center border border-white/10 shadow-2xl relative">
 
@@ -115,6 +108,20 @@
             </a>
         </div>
     </div>
+
+    @if (session('master_key'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                let userId = '{{ auth()->id() }}';
+                let newKey = @json(session('master_key'));
+
+                if (userId && newKey) {
+                    localStorage.setItem('e2e_recovery_' + userId, newKey);
+                    console.log('Recovery key securely saved to device storage.');
+                }
+            });
+        </script>
+    @endif
 
 </body>
 

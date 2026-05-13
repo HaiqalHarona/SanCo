@@ -10,6 +10,8 @@ use App\Events\MessageSent;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use FurqanSiddiqui\BIP39\BIP39;
+use App\Events\IncomingRequest;
+use App\Events\LoadContactList;
 
 new class extends Component {
     /**
@@ -46,6 +48,7 @@ new class extends Component {
             Friendship::acceptRequest(auth()->id(), $senderId);
             session()->flash('success', 'Friend request accepted');
             dispatch('request-accepted');
+            $this->reloadContacts($senderId);
         } catch (\Exception $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -126,7 +129,7 @@ new class extends Component {
 
         return $masterKey;
     }
-    
+
     /**
      *
      */
@@ -222,6 +225,7 @@ new class extends Component {
 
         try {
             Friendship::sendRequest(auth()->id(), $this->searchResult->_id);
+            broadcast(new IncomingRequest($this->searchResult->_id, auth()->user()->name))->toOthers(); // Send Event to the reciever
             session()->flash('success', 'Friend request sent to ' . $this->searchResult->name);
             $this->dispatch('friend-request-sent');
             $this->reset(['searchUserTag', 'searchResult']);
@@ -258,6 +262,16 @@ new class extends Component {
 
         $this->dispatch('scroll-bottom');
     }
+
+    public function reloadContacts($notifyUser)
+    {
+        unset($this->contacts);
+        unset($this->preloadChatList);
+
+        if ($notifyUser) {
+            broadcast(new LoadContactList($notifyUser, auth()->id()))->toOthers();
+        }
+    }
 };
 
 ?>
@@ -268,7 +282,17 @@ new class extends Component {
         showSettings: false,
         showRequests: false,
         showAddFriend: false,
-        addFriendTab: 'id'
+        addFriendTab: 'id',
+    
+        init() {
+            let userId = '{{ auth()->id() }}';
+            window.Echo.private('user.' + userId).listen('IncomingRequest', (e) => {
+    
+                $wire.$refresh();
+            }).listen('LoadContactList', (e) => {
+                $wire.reloadContacts();
+            });
+        }
     }" x-on:friend-request-sent.window="showAddFriend = false">
 
     <!-- NAVIGATION RAIL -->
@@ -556,12 +580,12 @@ new class extends Component {
             </div>
 
             <div id="chat-messages-container" wire:key="conversation-{{ $selected->_id }}"
-                class="flex-1 overflow-y-auto py-6 custom-scrollbar bg-transparent flex flex-col"
+                class="flex-1 overflow-y-auto py-6 custom-scrollbar bg-transparent flex flex-col text-left"
                 x-data="{
                     convoId: '{{ $this->selectedConversationId }}',
                 
                     init() {
-                        // 1. Scroll down immediately when opening the chat
+                        // Scroll down immediately when opening the chat
                         this.scrollToBottom();
                 
                         if (this.convoId) {
@@ -569,7 +593,7 @@ new class extends Component {
                                 .listen('MessageSent', (e) => {
                 
                                     $wire.$refresh().then(() => {
-                                        // 4. Scroll down so you can actually read the new message
+                                        // Scroll down so you can actually read the new message
                                         this.scrollToBottom();
                                     });
                 
@@ -616,12 +640,12 @@ new class extends Component {
                         @endphp
 
                         @if ($showHeader)
-                            <div class="mt-5 px-6 py-1.5 hover:bg-[#202024]/50 transition-all duration-200 group flex gap-4 rounded-lg"
+                            <div class="mt-5 px-6 py-1.5 hover:bg-[#202024]/50 transition-all duration-200 group flex justify-start items-start gap-4 rounded-lg w-full text-left"
                                 wire:key="msg-{{ $message->_id }}">
                                 <img src="{{ $senderAvatar }}"
                                     class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80 hover:scale-105 flex-shrink-0 mt-0.5 shadow-sm transition-all duration-200 ring-1 ring-white/5">
 
-                                <div class="flex flex-col flex-1 min-w-0">
+                                <div class="flex flex-col flex-1 min-w-0 text-left">
                                     {{-- Modified this flex container to push the header timestamp to the right --}}
                                     <div class="flex items-baseline justify-between mb-1 w-full pr-2">
                                         <span
@@ -633,23 +657,19 @@ new class extends Component {
                                             {{ $message->created_at->format('M j, g:i A') }}
                                         </span>
                                     </div>
-                                    <div
-                                        class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words">
-                                        {{ $message->body }}</div>
+                                    <div class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full">{{ $message->body }}</div>
                                 </div>
                             </div>
                         @else
-                            <div class="px-6 py-[3px] hover:bg-[#202024]/50 transition-all duration-200 group flex gap-4 relative rounded-lg"
+                            <div class="px-6 py-[3px] hover:bg-[#202024]/50 transition-all duration-200 group flex justify-start items-start gap-4 relative rounded-lg w-full text-left"
                                 wire:key="msg-{{ $message->_id }}">
 
                                 {{-- Empty spacer to keep text aligned with the avatar messages --}}
                                 <div class="w-10 flex-shrink-0 select-none"></div>
 
                                 {{-- Message Body --}}
-                                <div class="flex flex-col flex-1 min-w-0">
-                                    <div
-                                        class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words">
-                                        {{ $message->body }}</div>
+                                <div class="flex flex-col flex-1 min-w-0 text-left">
+                                    <div class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full">{{ $message->body }}</div>
                                 </div>
 
                                 {{-- Timestamp moved to the right, appearing on hover --}}
@@ -684,10 +704,44 @@ new class extends Component {
 
             </div>
 
-            @if (!$isSelf)
-                <div class="px-6 py-5 bg-[#1e1e21]/95 backdrop-blur-md border-t border-[#2a2a2d]">
-                    <form wire:submit="messageUser" class="relative flex items-center gap-3">
-                        <button type="button" class="text-[#52525b] hover:text-white transition-colors">
+            <div class="px-6 py-5 bg-[#1e1e21]/95 backdrop-blur-md border-t border-[#2a2a2d]">
+                @if ($isSelf)
+                    <div class="text-center mb-3">
+                        <span class="text-[#71717a] text-[10px] uppercase tracking-[0.2em] font-semibold">Saved
+                            Messages</span>
+                    </div>
+                @endif
+                <form wire:submit="messageUser" class="relative flex items-center gap-3" x-data="{
+                    maxSize: 10 * 1024 * 1024, // 10MB
+                    fileName: '',
+                    handleFile(e) {
+                        const file = e.target.files[0];
+                        if (!file) {
+                            this.fileName = '';
+                            return;
+                        }
+                        if (file.size > this.maxSize) {
+                            alert('File size exceeds 10MB limit.');
+                            e.target.value = '';
+                            this.fileName = '';
+                            return;
+                        }
+                        this.fileName = file.name;
+                    },
+                    removeFile() {
+                        document.getElementById('attachment-input').value = '';
+                        this.fileName = '';
+                    },
+                    clearOnSubmit() {
+                        this.removeFile();
+                    }
+                }"
+                    @submit="clearOnSubmit">
+
+                    <div>
+                        <input type="file" id="attachment-input" class="hidden" @change="handleFile">
+                        <button type="button" @click="document.getElementById('attachment-input').click()"
+                            class="text-[#52525b] hover:text-white transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
@@ -695,26 +749,34 @@ new class extends Component {
                             </svg>
                         </button>
 
-                        <input type="text" wire:model="messageBody"
-                            placeholder="Message {{ $selInfo['name'] }}..."
-                            class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
-                            autocomplete="off">
+                        <!-- Simple file preview badge -->
+                        <div x-show="fileName"
+                            class="absolute bottom-full left-0 mb-2 bg-[#202024] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg"
+                            style="display: none;">
+                            <span class="text-xs text-white truncate max-w-[150px]" x-text="fileName"></span>
+                            <button type="button" @click="removeFile"
+                                class="text-[#71717a] hover:text-red-500 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
 
-                        <button type="submit"
-                            class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-                            wire:loading.attr="disabled">
-                            <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                            </svg>
-                        </button>
-                    </form>
-                </div>
-            @else
-                <div class="px-6 py-4 bg-[#1e1e21]/30 border-t border-[#2a2a2d] text-center">
-                    <span class="text-[#71717a] text-[10px] uppercase tracking-[0.2em] font-semibold">Saved
-                        Messages</span>
-                </div>
-            @endif
+                    <input type="text" wire:model="messageBody" placeholder="Message {{ $selInfo['name'] }}..."
+                        class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
+                        autocomplete="off">
+
+                    <button type="submit"
+                        class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                        wire:loading.attr="disabled">
+                        <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
             {{-- end isSelf footer check --}}
         @else
             <div class="flex-1 flex items-center justify-center">

@@ -57,16 +57,16 @@ document.addEventListener('livewire:init', () => {
     window.Echo.join('presence.chat')
         .here((users) => {
             window.onlineUsers = users.map(user => user.id);
-            triggerPresenceUpdate(); // <--- Add this
+            triggerPresenceUpdate();
         })
         .joining((user) => {
             if (!window.onlineUsers.includes(user.id)) {
                 window.onlineUsers.push(user.id);
-                triggerPresenceUpdate(); // <--- Add this
+                triggerPresenceUpdate();
             }
         })
         .leaving((user) => {
             window.onlineUsers = window.onlineUsers.filter(id => id !== user.id);
-            triggerPresenceUpdate(); // <--- Add this
+            triggerPresenceUpdate();
         });
 });

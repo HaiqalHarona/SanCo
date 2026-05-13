@@ -31,7 +31,7 @@ class User extends MongoUser
         'google_id',
         'github_id',
         'user_tag',
-        'master_key'
+        'master_key',
     ];
 
     /**
