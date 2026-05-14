@@ -112,7 +112,7 @@
     @if (session('master_key'))
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                let userId = '{{ auth()->id() }}';
+                let userId = '{{ auth()->id() }}';          
                 let newKey = @json(session('master_key'));
 
                 if (userId && newKey) {

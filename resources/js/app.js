@@ -1,6 +1,9 @@
 import "./bootstrap";
 import { Notyf } from "notyf";
 import * as bip39 from 'bip39';
+import sodium from "libsodium-wrappers";
+
+window.sodium = sodium;
 
 window.onlineUsers = [];
 
