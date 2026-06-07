@@ -1,11 +1,50 @@
 import "./bootstrap";
+import "./encrypt";
 import { Notyf } from "notyf";
-import * as bip39 from 'bip39';
-import sodium from "libsodium-wrappers";
-
-window.sodium = sodium;
 
 window.onlineUsers = [];
+
+// Handle E2E Key derivation on load
+document.addEventListener('DOMContentLoaded', async () => {
+    const userId = window.userId; 
+    if (userId) {
+        let privateKey = sessionStorage.getItem('e2e_private_' + userId);
+        let publicKey = sessionStorage.getItem('e2e_public_' + userId);
+
+        if (!privateKey || !publicKey) {
+            const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
+            if (mnemonic) {
+                try {
+                    const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                    sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                    sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                    privateKey = keyPair.privateKey;
+                    publicKey = keyPair.publicKey;
+                    console.log('E2E keys derived and stored in session.');
+                } catch (e) {
+                    console.error('Failed to derive keys from mnemonic:', e);
+                }
+            }
+        }
+
+        // Sync public key to server if missing
+        if (publicKey && !window.userPublicKey) {
+            try {
+                await fetch('/api/save-public-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({ public_key: publicKey })
+                });
+                console.log('Public key synced to server.');
+            } catch (e) {
+                console.error('Failed to sync public key:', e);
+            }
+        }
+    }
+});
 
 // A global instance of Notyf
 window.notyf = new Notyf({

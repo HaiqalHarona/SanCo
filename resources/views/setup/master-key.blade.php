@@ -111,13 +111,34 @@
 
     @if (session('master_key'))
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('DOMContentLoaded', async function() {
                 let userId = '{{ auth()->id() }}';          
                 let newKey = @json(session('master_key'));
 
                 if (userId && newKey) {
                     localStorage.setItem('e2e_recovery_' + userId, newKey);
                     console.log('Recovery key securely saved to device storage.');
+
+                    // Derive keys and save public key to server
+                    try {
+                        const keyPair = await window.EncryptionService.deriveKeyPair(newKey);
+                        
+                        // Save private key to session storage (transient)
+                        sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                        sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+
+                        await fetch('{{ route('api.save-public-key') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({ public_key: keyPair.publicKey })
+                        });
+                        console.log('Public key saved to server.');
+                    } catch (e) {
+                        console.error('Failed to derive/save keys:', e);
+                    }
                 }
             });
         </script>
