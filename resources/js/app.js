@@ -8,6 +8,39 @@ window.onlineUsers = [];
 document.addEventListener('DOMContentLoaded', async () => {
     const userId = window.userId; 
     if (userId) {
+        // Automatically save new master key if provided (silent setup)
+        if (window.newMasterKey && !localStorage.getItem('e2e_recovery_' + userId)) {
+            const mnemonic = window.newMasterKey;
+            localStorage.setItem('e2e_recovery_' + userId, mnemonic);
+            console.log('New Master Key saved to localStorage.');
+
+            // Immediately derive and sync public key so encryption works on first message
+            try {
+                const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                
+                // Use the Livewire component if available on page, otherwise fallback to fetch
+                const messenger = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
+                if (messenger) {
+                    await messenger.savePublicKey(keyPair.publicKey);
+                    console.log('Public key synced via Livewire.');
+                } else {
+                    await fetch('/api/save-public-key', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({ public_key: keyPair.publicKey })
+                    });
+                    console.log('Public key synced via API.');
+                }
+            } catch (e) {
+                console.error('Initial key sync failed:', e);
+            }
+        }
+
         let privateKey = sessionStorage.getItem('e2e_private_' + userId);
         let publicKey = sessionStorage.getItem('e2e_public_' + userId);
 

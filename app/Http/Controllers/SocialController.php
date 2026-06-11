@@ -72,8 +72,9 @@ class SocialController extends Controller
                 Auth::login($appUser);
 
                 if ($appUser->wasRecentlyCreated) {
-                    return redirect()->route('setup.master-key')->with('master_key', $masterKey)
-                    ->with('success', 'Account Created, Save your recovery phrase now');
+                    return redirect()->route('messenger')
+                        ->with('new_master_key', $masterKey)
+                        ->with('success', 'Welcome! Your account has been created and secured.');
                 }
                 return redirect()->route('messenger')->with('success', 'Welcome '. $appUser->name);
             }

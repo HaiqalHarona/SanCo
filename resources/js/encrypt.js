@@ -8,16 +8,12 @@ class EncryptionService {
         this.sodium = sodium;
     }
 
-    async encryptMessage(body, recipientPublicKeys, senderPrivateKeyBase64) {
-        await this.init();
-    }
-
     /**
      * Derive a key pair from a BIP39 mnemonic
      * @param {string} mnemonic 
      * @returns {Promise<{publicKey: string, privateKey: string}>}
      */
-    async deriveKeyPair(mnemonic) {
+    async deriveKeyPair(mnemonic) { 
         await this.init();
         const seed = bip39.mnemonicToSeedSync(mnemonic);
         // Use the first 32 bytes of the seed for the key pair
@@ -92,6 +88,28 @@ class EncryptionService {
             console.error("Decryption failed", e);
             return "[Decryption Failed]";
         }
+    }
+
+    /**
+     * Helper to decrypt a message using keys from session storage
+     * @param {string} encBody 
+     * @param {Object} metadata 
+     * @param {string} userId 
+     * @returns {Promise<string>}
+     */
+    async decryptMessageForMe(encBody, metadata, userId) {
+        if (!metadata || !metadata.is_encrypted) return encBody;
+
+        const privateKey = sessionStorage.getItem('e2e_private_' + userId);
+        const publicKey = sessionStorage.getItem('e2e_public_' + userId);
+        const encKeyForMe = metadata.enc_keys?.[userId];
+        const nonce = metadata.nonce;
+
+        if (!privateKey || !publicKey || !encKeyForMe || !nonce) {
+            return "[Encrypted Message - Key Missing]";
+        }
+
+        return await this.decryptMessage(encBody, nonce, encKeyForMe, publicKey, privateKey);
     }
 }
 

@@ -1,16 +1,15 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="<?php echo e(str_replace('_', '-', app()->getLocale())); ?>">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'SanCo' }}</title>
+    <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
+    <title><?php echo e($title ?? 'SanCo'); ?></title>
 
     <script>
-        window.userId = '{{ auth()->id() }}';
-        window.userPublicKey = '{{ auth()->user()->public_key ?? '' }}';
-        window.newMasterKey = '{{ session('new_master_key') }}';
+        window.userId = '<?php echo e(auth()->id()); ?>';
+        window.userPublicKey = '<?php echo e(auth()->user()->public_key ?? ''); ?>';
 
         // On page load or when changing themes, best to add inline in `head` to avoid FOUC
         const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -49,10 +48,11 @@
     </script>
 
     <!-- Load Tailwind via Vite -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
 
     <!-- Livewire Styles -->
-    @livewireStyles
+    <?php echo \Livewire\Mechanisms\FrontendAssets\FrontendAssets::styles(); ?>
+
 </head>
 
 <body x-data 
@@ -60,12 +60,12 @@
     class="font-sans antialiased h-screen overflow-hidden flex flex-col selection:bg-pink-500/30 transition-colors duration-300"
     :style="$store.theme.current === 'light' ? 'background-color: #fdf8f5; color: #432818;' : 'background-color: #18181b; color: white;'">
     <div id="session-container">
-        @if(session()->has('success'))
-            <div id="wire-session-success" class="hidden">{{ session('success') }}</div>
-        @endif
-        @if(session()->has('error'))
-            <div id="wire-session-error" class="hidden">{{ session('error') }}</div>
-        @endif
+        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(session()->has('success')): ?>
+            <div id="wire-session-success" class="hidden"><?php echo e(session('success')); ?></div>
+        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(session()->has('error')): ?>
+            <div id="wire-session-error" class="hidden"><?php echo e(session('error')); ?></div>
+        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
     </div>
     <!-- Add theme-specific colors for text/bg when in light mode if not using Tailwind dark: classes everywhere -->
     <style x-ref="themeStyles">
@@ -189,11 +189,13 @@
 
     <!-- Main Content Slot -->
     <main class="flex-1 flex overflow-hidden">
-        {{ $slot }}
+        <?php echo e($slot); ?>
+
     </main>
 
     <!-- Livewire Scripts -->
-    @livewireScripts
+    <?php echo \Livewire\Mechanisms\FrontendAssets\FrontendAssets::scripts(); ?>
+
 
     <!-- Global Notifications - Handled by Livewire hook in app.js -->
     <script>
@@ -202,4 +204,4 @@
     </script>
 </body>
 
-</html>
+</html><?php /**PATH /home/ninonakano/Desktop/Telefon-MultiPlatform/resources/views/layouts/app.blade.php ENDPATH**/ ?>

@@ -12,7 +12,6 @@ Route::get('/auth/{provider}/callback', [SocialController::class, 'callbackReque
 
 Route::middleware('auth')->group(function () {
     Volt::route('/chat', 'messenger')->name('messenger');
-    Route::view('/setup/master-key', 'setup.master-key')->name('setup.master-key');
     Route::post('/logout', [SocialController::class, 'logout'])->name('logout');
     
     Route::post('/api/save-public-key', function (Illuminate\Http\Request $request) {

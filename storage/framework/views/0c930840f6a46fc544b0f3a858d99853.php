@@ -10,44 +10,17 @@
         activeTab: 'profile',
     
         // --- PROFILE DATA ---
-        profileImagePreview: @js(auth()->user()->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode(auth()->user()->name)),
+        profileImagePreview: <?php echo \Illuminate\Support\Js::from(auth()->user()->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode(auth()->user()->name))->toHtml() ?>,
         cropper: null,
         showCropModal: false,
     
-        // --- SECURITY DATA ---
+        // --- SECURITY DATA (STATIC PLACEHOLDER) ---
         recoveryKey: '',
         isKeyVisible: false,
         keyCopied: false,
     
         initData() {
-            const userId = window.userId;
-            if (userId) {
-                // Priority: Use the session's newMasterKey if it exists (first login), otherwise check localStorage
-                this.recoveryKey = window.newMasterKey || localStorage.getItem('e2e_recovery_' + userId) || '';
-            }
-        },
-    
-        async generateKey() {
-            if (this.recoveryKey && !confirm('Generating a new key will overwrite your current one. You will lose access to old encrypted messages unless you have the old key saved. Continue?')) {
-                return;
-            }
-            
-            const newKey = await $wire.generateNewKey();
-            if (newKey) {
-                const userId = window.userId;
-                localStorage.setItem('e2e_recovery_' + userId, newKey);
-                this.recoveryKey = newKey;
-                
-                // Trigger key derivation
-                const keyPair = await window.EncryptionService.deriveKeyPair(newKey);
-                sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
-                sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
-                
-                // Sync to server via Livewire
-                await $wire.savePublicKey(keyPair.publicKey);
-                
-                window.notyf.success('New Recovery Key generated and synced!');
-            }
+            // Stripped out dynamic loading. Only using the placeholder above for UI testing.
         },
     
         initCropper(imageElement) {
@@ -131,7 +104,7 @@
 
         <div class="p-6 md:p-10">
 
-            {{-- PROFILE TAB --}}
+            
             <div x-show="activeTab === 'profile'" x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
                 class="space-y-10">
@@ -158,9 +131,9 @@
                     </div>
                     <div class="text-center sm:text-left pt-2">
                         <h4 class="text-gray-900 dark:text-white font-bold text-xl"
-                            x-text="$wire.profileName || '{{ auth()->user()->name }}'"></h4>
+                            x-text="$wire.profileName || '<?php echo e(auth()->user()->name); ?>'"></h4>
                         <p class="text-pink-500 dark:text-pink-400 text-sm font-medium mt-1">
-                            {{ auth()->user()->user_tag ?? '#NotSet' }}</p>
+                            <?php echo e(auth()->user()->user_tag ?? '#NotSet'); ?></p>
                         <label for="avatarUpload"
                             class="inline-block mt-4 px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-white text-xs font-semibold rounded-lg transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">Change
                             Avatar</label>
@@ -181,7 +154,7 @@
                 </div>
             </div>
 
-            {{-- SECURITY TAB --}}
+            
             <div x-show="activeTab === 'security'" style="display:none;"
                 x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
                 x-transition:enter-end="opacity-100 translate-y-0" class="space-y-8">
@@ -206,14 +179,14 @@
 
                                 <button type="button" @click="isKeyVisible = !isKeyVisible"
                                     class="p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">
-                                    {{-- Eye Closed Icon (When Visible) --}}
+                                    
                                     <svg x-show="isKeyVisible" x-cloak class="w-4 h-4" fill="none"
                                         stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21">
                                         </path>
                                     </svg>
-                                    {{-- Eye Open Icon (When Hidden) --}}
+                                    
                                     <svg x-show="!isKeyVisible" class="w-4 h-4" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -241,50 +214,45 @@
                                 </button>
                             </div>
 
-                            {{-- Status Badge --}}
-                            @if (auth()->user()->master_key)
+                            
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(auth()->user()->master_key): ?>
                                 <span
                                     class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
                                     Active
                                 </span>
-                            @else
+                            <?php else: ?>
                                 <span
                                     class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
                                     Not Setup
                                 </span>
-                            @endif
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         </div>
                     </div>
 
-                    {{-- MASKED MULTILINE PHRASE BOX (Cleaned Up) --}}
+                    
                     <div class="relative w-full" wire:ignore>
                         <div class="w-full bg-white dark:bg-[#1e1e21] border border-gray-200 dark:border-white/10 rounded-xl p-6 md:px-8 text-center font-mono text-gray-900 dark:text-pink-500 shadow-sm dark:shadow-inner transition-all duration-300 flex items-center justify-center min-h-[140px] overflow-hidden"
                             :class="{ 'opacity-50': !recoveryKey }">
 
-                            {{-- The actual text container --}}
+                            
                             <div x-show="recoveryKey" class="w-full max-w-full transition-all duration-300" x-cloak>
-                                {{-- HIDDEN STATE --}}
+                                
                                 <p x-show="!isKeyVisible"
                                     class="text-xl md:text-2xl tracking-[0.2em] md:tracking-[0.25em] select-none opacity-60 mt-1 break-all w-full leading-relaxed">
                                     •••••••••••••••
                                 </p>
 
-                                {{-- REVEALED STATE --}}
+                                
                                 <p x-show="isKeyVisible"
                                     class="text-[14px] md:text-[15px] leading-loose select-all break-words w-full"
                                     x-text="recoveryKey"></p>
                             </div>
 
-                            {{-- EMPTY STATE --}}
-                            <div x-show="!recoveryKey" class="flex flex-col items-center gap-4" x-cloak>
-                                <p class="text-gray-400 dark:text-gray-500 tracking-widest text-xs">
-                                    NO KEY FOUND
-                                </p>
-                                <button type="button" @click="generateKey()"
-                                    class="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md">
-                                    Generate New Key
-                                </button>
-                            </div>
+                            
+                            <p x-show="!recoveryKey" class="text-gray-400 dark:text-gray-500 tracking-widest text-xs"
+                                x-cloak>
+                                NO KEY FOUND
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -304,7 +272,7 @@
         </div>
     </div>
 
-    {{-- CROP MODAL --}}
+    
     <div x-show="showCropModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-md"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
@@ -332,4 +300,4 @@
             </div>
         </div>
     </div>
-</div>
+</div><?php /**PATH /home/ninonakano/Desktop/Telefon-MultiPlatform/resources/views/livewire/messenger/settings-overlay.blade.php ENDPATH**/ ?>
