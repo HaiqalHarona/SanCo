@@ -60,18 +60,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // Sync public key to server if missing
-        if (publicKey && !window.userPublicKey) {
+        // Sync public key to server if missing OR to ensure consistency
+        if (publicKey) {
             try {
-                await fetch('/api/save-public-key', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                    },
-                    body: JSON.stringify({ public_key: publicKey })
-                });
-                console.log('Public key synced to server.');
+                const syncToDB = async (publicKey) => {
+                    const messengerEl = document.querySelector('[wire\\:id]');
+                    if (messengerEl && window.Livewire) {
+                        const messenger = window.Livewire.find(messengerEl.getAttribute('wire:id'));
+                        if (messenger) {
+                            await messenger.savePublicKey(publicKey);
+                            console.log('Public key synced via Livewire.');
+                            return true;
+                        }
+                    }
+
+                    await fetch('/api/save-public-key', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({ public_key: publicKey })
+                    });
+                    console.log('Public key synced via API.');
+                    return true;
+                };
+
+                // If server doesn't have it, or we just want to be sure
+                if (!window.userPublicKey || window.userPublicKey === '') {
+                    await syncToDB(publicKey);
+                }
             } catch (e) {
                 console.error('Failed to sync public key:', e);
             }

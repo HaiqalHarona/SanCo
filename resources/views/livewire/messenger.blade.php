@@ -160,6 +160,7 @@ new class extends Component {
         $convo->setRelation('messages', $messages->getCollection()->reverse());
 
         // Load participant public keys with string IDs to match JS auth()->id()
+        // We use fresh User queries to ensure we get the latest public_key from the database
         $participants = User::whereIn('_id', $convo->participant_ids)->get(['_id', 'public_key']);
         $convo->participant_public_keys = $participants->mapWithKeys(function ($user) {
             return [(string) $user->_id => $user->public_key];
@@ -293,6 +294,9 @@ new class extends Component {
     {
         $user = User::find(auth()->id());
         $user->update(['public_key' => $publicKey]);
+        
+        // Force re-evaluation of computed properties
+        unset($this->selectedConversation);
         
         // Refresh component state
         $this->dispatch('$refresh');
@@ -586,8 +590,13 @@ new class extends Component {
                         <h2 class="text-white text-[15px] font-bold leading-tight">{{ $selInfo['name'] }}</h2>
                         <div class="flex items-center gap-2 mt-0.5">
                             @php
+                                $myKey = $selected->participant_public_keys[auth()->id()] ?? null;
+                                $othersMissing = collect($selected->participant_public_keys)
+                                    ->forget(auth()->id())
+                                    ->contains(null);
                                 $allKeysSet = count($selected->participant_public_keys) > 0 && !collect($selected->participant_public_keys)->contains(null);
                             @endphp
+
                             @if ($allKeysSet)
                                 <span
                                     class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
@@ -598,15 +607,23 @@ new class extends Component {
                                     </svg>
                                     Encrypted
                                 </span>
-                            @else
+                            @elseif(!$myKey)
                                 <button type="button" @click="syncMyKey()"
-                                    class="flex items-center gap-1 text-[10px] text-[#71717a] hover:text-pink-500 font-bold uppercase tracking-wider transition-colors group/sec">
-                                    <svg class="w-3 h-3 group-hover/sec:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    class="flex items-center gap-1 text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase tracking-wider transition-colors group/sec">
+                                    <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
-                                    Standard (Update Keys)
+                                    Update Your Keys
                                 </button>
+                            @else
+                                <span class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    Standard (Waiting for keys)
+                                </span>
                             @endif
                             
                             <span x-show="isOnline" class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider" style="display:none;">

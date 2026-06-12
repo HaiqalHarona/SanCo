@@ -96,6 +96,25 @@
         },
     
         // --- SECURITY FUNCTIONS ---
+        async syncLocalKeyToServer() {
+            const userId = window.userId;
+            const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
+            if (!mnemonic) {
+                window.notyf.error('No local key found to sync.');
+                return;
+            }
+            
+            try {
+                const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                await $wire.savePublicKey(keyPair.publicKey);
+                window.notyf.success('Keys synced to server!');
+                this.recoveryKey = mnemonic;
+            } catch (e) {
+                console.error('Manual sync failed:', e);
+                window.notyf.error('Sync failed. See console.');
+            }
+        },
+
         copyRecoveryKey() {
             if (!this.recoveryKey) return;
             navigator.clipboard.writeText(this.recoveryKey);
@@ -242,17 +261,28 @@
                             </div>
 
                             {{-- Status Badge --}}
-                            @if (auth()->user()->master_key)
-                                <span
-                                    class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
-                                    Active
-                                </span>
-                            @else
-                                <span
-                                    class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
-                                    Not Setup
-                                </span>
-                            @endif
+                            <div class="flex items-center gap-2">
+                                @if (auth()->user()->master_key && auth()->user()->public_key)
+                                    <span
+                                        class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                        Active & Synced
+                                    </span>
+                                @elseif(auth()->user()->master_key)
+                                    <span
+                                        class="bg-amber-500/10 text-amber-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                        Needs Sync
+                                    </span>
+                                    <button type="button" @click="syncLocalKeyToServer()"
+                                        class="text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase underline">
+                                        Sync Now
+                                    </button>
+                                @else
+                                    <span
+                                        class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                        Not Setup
+                                    </span>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
