@@ -76,6 +76,12 @@ new class extends Component {
     public function mount()
     {
         $this->profileName = auth()->user()->name;
+
+        if (request()->has('join')) {
+            $this->searchUserTag = request()->query('join');
+            $this->searchContact();
+            $this->dispatch('open-add-friend-modal');
+        }
     }
 
     public function updateProfile()
@@ -314,7 +320,7 @@ new class extends Component {
         addFriendTab: 'id',
     
         init() {
-            let userId = @js(auth()->id());
+            let userId = @js((string) auth()->id());
             window.Echo.private('user.' + userId).listen('IncomingRequest', (e) => {
     
                 $wire.$refresh();
@@ -322,7 +328,8 @@ new class extends Component {
                 $wire.reloadContacts();
             });
         }
-    }" x-on:friend-request-sent.window="showAddFriend = false">
+    }" x-on:friend-request-sent.window="showAddFriend = false"
+    x-on:open-add-friend-modal.window="showAddFriend = true">
 
     <!-- NAVIGATION RAIL -->
     <div class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
@@ -400,7 +407,7 @@ new class extends Component {
             </button>
 
             <a href="{{ route('logout') }}"
-                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('logout')); document.getElementById('logout-form').submit();"
                 class="p-3 text-[#71717a] hover:text-red-500 transition group relative inline-block cursor-pointer">
 
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
@@ -561,7 +568,7 @@ new class extends Component {
                 class="h-16 flex items-center justify-between px-6 py-4 bg-[#1e1e21]/80 backdrop-blur-md border-b border-[#2a2a2d] z-10 sticky top-0">
                 <div class="flex items-center gap-4" x-data="{
                     async syncMyKey() {
-                        const userId = @js(auth()->id());
+                        const userId = @js((string) auth()->id());
                         const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
                         if (!mnemonic) {
                             window.notyf.error('No recovery key found. Please generate one in Settings.');
@@ -752,7 +759,7 @@ new class extends Component {
                                             this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
                                                 @js($message->body),
                                                 @js($message->metadata),
-                                                @js(auth()->id())
+                                                @js((string) auth()->id())
                                             );
                                         }
                                     }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
@@ -775,7 +782,7 @@ new class extends Component {
                                             this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
                                                 @js($message->body),
                                                 @js($message->metadata),
-                                                @js(auth()->id())
+                                                @js((string) auth()->id())
                                             );
                                         }
                                     }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
@@ -849,7 +856,7 @@ new class extends Component {
                         if (!body || !body.trim()) return;
 
                         let keys = @js($selected->participant_public_keys ?? []);
-                        const userId = @js(auth()->id());
+                        const userId = @js((string) auth()->id());
                         let privateKey = sessionStorage.getItem('e2e_private_' + userId);
                         let publicKey = sessionStorage.getItem('e2e_public_' + userId);
 
@@ -979,7 +986,7 @@ new class extends Component {
         <div class="relative w-full max-w-md bg-[#1e1e21] rounded-3xl overflow-hidden shadow-2xl border border-white/5 p-6 md:p-8"
             x-data="{
                 tag: @js(auth()->user()->user_tag ?? 'Not Set'),
-                link: @js('https://telefon.app/j/' . (auth()->user()->user_tag ?? 'default')),
+                link: @js(url('/j/' . (auth()->user()->user_tag ?? 'default'))),
                 copied: false,
                 copy(text) {
                     navigator.clipboard.writeText(text);
@@ -1070,12 +1077,12 @@ new class extends Component {
                             @endif
                         </form>
                     </div>
-
+ 
                     <div class="w-1/2 flex-shrink-0 px-1">
                         <div class="space-y-6">
                             <div class="bg-pink-500/5 border border-pink-500/10 rounded-2xl p-5">
                                 <p class="text-sm text-[#a1a1aa] mb-4">Share this link with your friends to instantly
-                                    connect on Telefon.</p>
+                                    connect on SanCo.</p>
                                 <div class="flex items-center gap-2">
                                     <input type="text" readonly :value="link"
                                         class="flex-1 bg-[#18181b] border border-[#2a2a2d] rounded-xl px-4 py-3 text-xs text-[#71717a] outline-none">

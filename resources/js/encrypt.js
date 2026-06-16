@@ -83,6 +83,10 @@ class EncryptionService {
             const nonce = this.sodium.from_base64(nonceBase64);
             const decryptedBody = this.sodium.crypto_secretbox_open_easy(encBody, nonce, msgKey);
             
+            if (!decryptedBody) {
+                throw new Error("Secretbox decryption returned null/false");
+            }
+
             return this.sodium.to_string(decryptedBody);
         } catch (e) {
             console.error("Decryption failed", e);
@@ -94,18 +98,30 @@ class EncryptionService {
      * Helper to decrypt a message using keys from session storage
      * @param {string} encBody 
      * @param {Object} metadata 
-     * @param {string} userId 
+     * @param {string|Object} userId 
      * @returns {Promise<string>}
      */
     async decryptMessageForMe(encBody, metadata, userId) {
         if (!metadata || !metadata.is_encrypted) return encBody;
 
-        const privateKey = sessionStorage.getItem('e2e_private_' + userId);
-        const publicKey = sessionStorage.getItem('e2e_public_' + userId);
-        const encKeyForMe = metadata.enc_keys?.[userId];
+        // CRITICAL: Handle MongoDB ObjectId serialization if passed as object
+        const uid = (typeof userId === 'object' && userId !== null && userId.$oid) 
+            ? userId.$oid 
+            : String(userId);
+
+        const privateKey = sessionStorage.getItem('e2e_private_' + uid);
+        const publicKey = sessionStorage.getItem('e2e_public_' + uid);
+        const encKeyForMe = metadata.enc_keys?.[uid];
         const nonce = metadata.nonce;
 
         if (!privateKey || !publicKey || !encKeyForMe || !nonce) {
+            console.warn('E2E Decryption skipped: Missing keys/nonce', { 
+                uid, 
+                hasPrivate: !!privateKey, 
+                hasPublic: !!publicKey, 
+                hasEncKey: !!encKeyForMe, 
+                hasNonce: !!nonce 
+            });
             return "[Encrypted Message - Key Missing]";
         }
 

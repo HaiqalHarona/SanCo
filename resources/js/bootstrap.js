@@ -1,4 +1,7 @@
 import axios from "axios";
+import { Buffer } from "buffer";
+
+window.Buffer = Buffer;
 window.axios = axios;
 
 window.axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";

@@ -14,6 +14,10 @@ Route::middleware('auth')->group(function () {
     Volt::route('/chat', 'messenger')->name('messenger');
     Route::post('/logout', [SocialController::class, 'logout'])->name('logout');
     
+    Route::get('/j/{tag}', function ($tag) {
+        return redirect()->route('messenger', ['join' => $tag]);
+    })->name('join');
+    
     Route::post('/api/save-public-key', function (Illuminate\Http\Request $request) {
         $request->validate(['public_key' => 'required|string']);
         auth()->user()->update(['public_key' => $request->public_key]);

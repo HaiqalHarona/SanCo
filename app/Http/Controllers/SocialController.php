@@ -15,6 +15,12 @@ class SocialController extends Controller
 
     public function redirectProvider($provider)
     {
+        if ($provider === 'google') {
+            return Socialite::driver($provider)
+                ->with(['prompt' => 'select_account'])
+                ->redirect();
+        }
+
         return Socialite::driver($provider)->redirect();
     }
 
@@ -104,9 +110,21 @@ class SocialController extends Controller
 
     public function logout(Request $request)
     {
+        // Get the current user ID before logout to clear specific session keys if needed
+        $userId = Auth::id();
+        
         Auth::logout();
+        
+        // Invalidate the session and regenerate the token to prevent session fixation
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        // Clear any specific session data that might linger
+        $request->session()->forget([
+            'new_master_key',
+            'e2e_private_' . $userId,
+            'e2e_public_' . $userId
+        ]);
 
         return redirect()->route('auth')->with('success', 'Logged out successfully');
     }

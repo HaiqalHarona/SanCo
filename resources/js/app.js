@@ -146,6 +146,24 @@ const triggerPresenceUpdate = () => {
     window.dispatchEvent(new CustomEvent('presence-updated'));
 };
 
+window.addEventListener('logout', () => {
+    const userId = window.userId;
+    if (userId) {
+        localStorage.removeItem('e2e_recovery_' + userId);
+        sessionStorage.removeItem('e2e_private_' + userId);
+        sessionStorage.removeItem('e2e_public_' + userId);
+    }
+    // Also clear general keys just in case
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('e2e_recovery_')) localStorage.removeItem(key);
+    }
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key.startsWith('e2e_private_') || key.startsWith('e2e_public_')) sessionStorage.removeItem(key);
+    }
+});
+
 document.addEventListener('livewire:init', () => {
     window.Echo.join('presence.chat')
         .here((users) => {
