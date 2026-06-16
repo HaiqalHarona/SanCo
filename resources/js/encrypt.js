@@ -36,14 +36,14 @@ class EncryptionService {
     async encryptMessage(body, recipientPublicKeys, senderPrivateKeyBase64) {
         await this.init();
         
-        // 1. Generate a random symmetric key
+        // Generate a random symmetric key
         const msgKey = this.sodium.randombytes_buf(this.sodium.crypto_secretbox_KEYBYTES);
         const nonce = this.sodium.randombytes_buf(this.sodium.crypto_secretbox_NONCEBYTES);
         
-        // 2. Encrypt the message body with the symmetric key
+        // Encrypt the message body with the symmetric key
         const encBody = this.sodium.crypto_secretbox_easy(body, nonce, msgKey);
         
-        // 3. Encrypt the symmetric key for each recipient (using anonymous box for simplicity and privacy)
+        // Encrypt the symmetric key for each recipient (using anonymous box for simplicity and privacy)
         const encryptedKeys = {};
         for (const [userId, publicKeyBase64] of Object.entries(recipientPublicKeys)) {
             const publicKey = this.sodium.from_base64(publicKeyBase64);
@@ -75,10 +75,10 @@ class EncryptionService {
             const myPrivateKey = this.sodium.from_base64(myPrivateKeyBase64);
             const encKeyForMe = this.sodium.from_base64(encKeyForMeBase64);
             
-            // 1. Decrypt the symmetric key
+            // Decrypt the symmetric key
             const msgKey = this.sodium.crypto_box_seal_open(encKeyForMe, myPublicKey, myPrivateKey);
             
-            // 2. Decrypt the body
+            // Decrypt the body
             const encBody = this.sodium.from_base64(encBodyBase64);
             const nonce = this.sodium.from_base64(nonceBase64);
             const decryptedBody = this.sodium.crypto_secretbox_open_easy(encBody, nonce, msgKey);
