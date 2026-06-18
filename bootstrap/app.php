@@ -14,10 +14,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->statefulApi();
+        $middleware->web(append: [
+            \App\Http\Middleware\DetectConcurrentLogins::class,
+        ]);
         $middleware->redirectTo(
             guests: fn () => session()->flash('error', 'Please log in to access your chats.') ? '/' : '/'
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Handle session expiration (HTTP 419) by redirecting to login with a message
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, \Illuminate\Http\Request $request) {
+            return redirect()->route('auth')->with('error', 'Your session has expired. Please log in again.');
+        });
     })->create();
