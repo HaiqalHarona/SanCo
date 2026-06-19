@@ -1,6 +1,6 @@
 # End-to-End Encryption (E2EE) System Documentation
 
-This project implements a robust End-to-End Encryption (E2EE) system using **BIP39 mnemonics** for key derivation and **libsodium** for cryptographic operations. This ensures that only the intended recipients can read the message content, as the server never sees the plaintext body or the private keys.
+This project implements a robust End-to-End Encryption (E2EE) system using **BIP39 mnemonics** for key derivation and **libsodium** for cryptographic operations. This ensures that only the intended[...]
 
 ---
 
@@ -141,24 +141,51 @@ To enable E2E communication, users must exchange public keys securely. The workf
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Alice as Sender (Alice)
+    actor Alice as Alice (Sender)
     participant DB as Server/Database
-    actor Bob as Receiver (Bob)
+    actor Bob as Bob (Receiver)
 
-    Note over Bob: Generates Mnemonic on setup
-    Bob->>DB: Sync public key via /api/save-public-key
-    Note over DB: Stores Bob's public key in 'users' collection
+    rect rgb(200, 220, 255)
+    Note over Alice,Bob: Phase 1: Initial Key Registration
+    
+    Bob->>DB: 1. Register: POST /api/save-public-key
+    Note right of Bob: Derives keypair from mnemonic<br/>(24-word recovery phrase)
+    DB->>DB: 2. Store Bob's public key<br/>in 'users' collection
+    DB-->>Bob: ✓ Public key saved
+    end
 
-    Alice->>DB: Fetch Conversation Participants
-    DB-->>Alice: Return participant public keys (Bob's key)
+    rect rgb(220, 255, 220)
+    Note over Alice,Bob: Phase 2: Prepare to Send Message
+    
+    Alice->>DB: 3. Fetch: GET /api/participants?conversation_id
+    DB-->>Alice: 4. Return all participant public keys<br/>(including Bob's public key)
+    Alice->>Alice: 5. Generate random message key (msgKey)<br/>Encrypt message body with msgKey
+    end
 
-    Note over Alice: Generates random msgKey<br/>Encrypts message with msgKey
-    Note over Alice: Encrypts msgKey with Bob's public key
-    Alice->>DB: Send encBody, nonce, and envelope keys map
-    Note over DB: Saves encrypted message record
+    rect rgb(255, 235, 205)
+    Note over Alice,Bob: Phase 3: Wrap Keys & Send
+    
+    Alice->>Alice: 6. For each recipient (Bob):<br/>Seal msgKey with their public key<br/>enc_keys[Bob_ID] = seal(msgKey, Bob_pubKey)
+    
+    Alice->>DB: 7. Send encrypted package:<br/>{ encBody, nonce, keys_map }
+    DB->>DB: 8. Store encrypted message record
+    Note left of DB: Server sees only ciphertext<br/>Cannot access plain message or msgKey
+    DB-->>Alice: ✓ Message delivered
+    end
 
-    DB->>Bob: Deliver encrypted payload & keys map
-    Note over Bob: Retrieves Bob's encrypted msgKey<br/>Decrypts msgKey with local private key<br/>Decrypts encBody with msgKey
+    rect rgb(255, 220, 230)
+    Note over Alice,Bob: Phase 4: Receive & Decrypt
+    
+    DB->>Bob: 9. Deliver encrypted payload<br/>{ encBody, nonce, keys_map }
+    
+    Bob->>Bob: 10. Extract Bob's encrypted key:<br/>encKeyForMe = keys_map[Bob_ID]
+    
+    Bob->>Bob: 11. Unseal with private key:<br/>msgKey = unseal(encKeyForMe,<br/>Bob_privKey)
+    
+    Bob->>Bob: 12. Decrypt message body:<br/>plaintext = decrypt(encBody,<br/>msgKey, nonce)
+    
+    Note right of Bob: Only Bob can decrypt<br/>using his private key
+    end
 ```
 
 ### 6.1 Public Key Registration (Alice/Bob Setup)
