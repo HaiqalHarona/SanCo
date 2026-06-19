@@ -131,3 +131,58 @@ async decryptMessageForMe(encBody, metadata, userId) {
 - **Forced Re-Auth**: Login routes use `prompt=select_account` to ensure users can switch accounts without auto-logging into the previous session.
 - **Storage Isolation**: Keys are explicitly tied to `userId` in storage to prevent accidental decryption if storage isn't cleared.
 - **Automatic Scrubbing**: Any logout action triggers a browser event that purges all E2E keys from `localStorage` and `sessionStorage`.
+
+---
+
+## 6. Key Synchronization & Message Exchange
+
+To enable E2E communication, users must exchange public keys securely. The workflow below describes how keys are synchronized and shared:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Alice as Sender (Alice)
+    participant DB as Server/Database
+    actor Bob as Receiver (Bob)
+
+    Note over Bob: Generates Mnemonic on setup
+    Bob->>DB: Sync public key via /api/save-public-key
+    Note over DB: Stores Bob's public key in 'users' collection
+
+    Alice->>DB: Fetch Conversation Participants
+    DB-->>Alice: Return participant public keys (Bob's key)
+
+    Note over Alice: Generates random msgKey<br/>Encrypts message with msgKey
+    Note over Alice: Encrypts msgKey with Bob's public key
+    Alice->>DB: Send encBody, nonce, and envelope keys map
+    Note over DB: Saves encrypted message record
+
+    DB->>Bob: Deliver encrypted payload & keys map
+    Note over Bob: Retrieves Bob's encrypted msgKey<br/>Decrypts msgKey with local private key<br/>Decrypts encBody with msgKey
+```
+
+### 6.1 Public Key Registration (Alice/Bob Setup)
+On initial login or recovery, the client derives its key pair from the mnemonic. If the server does not yet store the public key for the user, the client automatically uploads it via:
+1. The Livewire component's `savePublicKey` action in [messenger.blade.php](file:///home/ninonakano/Desktop/SanCo/resources/views/livewire/messenger.blade.php).
+2. The `/api/save-public-key` fallback endpoint in [routes/web.php](file:///home/ninonakano/Desktop/SanCo/routes/web.php).
+
+Once uploaded, the public key is persisted on the user's document in the Database (`users` collection).
+
+### 6.2 Key Retreival & Symmetric Envelope Wrapping (Sending)
+When Alice writes a message to Bob in a shared conversation:
+1. The client retrieves the public keys of all conversation participants (`participant_public_keys`).
+2. The client generates a random, message-specific symmetric key (`msgKey`) using `libsodium`.
+3. The message body is encrypted symmetrically with `msgKey`.
+4. The `msgKey` is encrypted (sealed) individually for each participant using their respective public keys:
+   $$\text{enc\_keys}[\text{userId}] = \text{sodium.crypto\_box\_seal}(\text{msgKey}, \text{publicKey}_{\text{userId}})$$
+5. The payload containing the encrypted body (`encBody`), the initialization vector (`nonce`), and the map of encrypted symmetric keys (`keys`) is dispatched to the server.
+
+### 6.3 Localized Envelope Unwrapping (Receiving)
+When Bob receives the message from the server:
+1. The client checks `sessionStorage` for the user's private key.
+2. The client extracts Bob's specific encrypted key envelope from the message metadata:
+   $$\text{encKeyForMe} = \text{metadata.enc\_keys}[\text{Bob's userId}]$$
+3. Bob's private key opens (unseals) the envelope to retrieve the raw symmetric `msgKey`:
+   $$\text{msgKey} = \text{sodium.crypto\_box\_seal\_open}(\text{encKeyForMe}, \text{Bob's publicKey}, \text{Bob's privateKey})$$
+4. The client uses the recovered `msgKey` and `nonce` to decrypt the raw message body locally. Plaintext is never exposed to the server.
+

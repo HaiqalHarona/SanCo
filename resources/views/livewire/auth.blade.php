@@ -53,9 +53,8 @@ layout('layouts.auth');
                 {{-- Sliding panel content --}}
                 <div class="relative z-10 flex flex-col justify-between h-full p-8 md:p-10">
                     {{-- Logo --}}
-                    <div class="flex items-center gap-2.5">
-                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-8 h-8 object-contain" alt="SanCo Logo">
-                        <span class="text-white font-semibold text-lg tracking-tight">SanCo</span>
+                    <div class="flex items-center gap-3">
+                
                     </div>
 
                     {{-- Center content --}}
@@ -116,8 +115,8 @@ layout('layouts.auth');
             <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
 
                 {{-- Logo Placeholder --}}
-                <div class="flex justify-center mb-6">
-                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-16 w-auto object-contain" alt="SanCo Logo">
+                <div class="flex justify-center -mb-14">
+                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-72 w-auto object-contain -my-14" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
                 </div>
 
                 {{-- Heading --}}

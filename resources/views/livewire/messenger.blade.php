@@ -335,8 +335,8 @@ new class extends Component {
     <div class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
 
         <div class="space-y-6 flex-1 flex flex-col items-center">
-            <div class="p-3 mb-4">
-                <img src="{{ asset('images/logo/SanCo.png') }}" class="w-8 h-8 object-contain" alt="SanCo Logo">
+            <div class="mb-4 w-full flex justify-center items-center px-0">
+                <img src="{{ asset('images/logo/SanCo.png') }}" class="w-full h-auto object-contain" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 2px rgba(255, 0, 127, 0.9));">
             </div>
 
             <button @click="activeTab = 'chats'; showSettings = false"
@@ -954,8 +954,8 @@ new class extends Component {
         @else
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-center space-y-4">
-                    <div class="p-6 bg-[#1e1e21] rounded-3xl inline-block border border-white/5 shadow-2xl">
-                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-16 h-16 object-contain mx-auto" alt="SanCo Logo">
+                    <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
+                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-white">Your Chat Canvas</h2>

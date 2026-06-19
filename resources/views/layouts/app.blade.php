@@ -64,7 +64,7 @@
             <div id="wire-session-success" class="hidden">{{ session('success') }}</div>
         @endif
         @if(session()->has('error'))
-            <div id="wire-session-error" class="hidden">{{ session('error') }}</div>
+            <div id="wire-session-error" class="hidden" data-avatar="{{ session('avatar') }}">{{ session('error') }}</div>
         @endif
     </div>
     <!-- Add theme-specific colors for text/bg when in light mode if not using Tailwind dark: classes everywhere -->

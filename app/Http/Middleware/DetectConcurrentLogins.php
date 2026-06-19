@@ -26,13 +26,18 @@ class DetectConcurrentLogins
                 $location = $user->last_login_location ?? 'Unknown';
                 $browser = $user->last_login_browser ?? 'Unknown Browser';
 
+                $avatar = $user->avatar;
+
                 // Log the old session out immediately
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
                 // Redirect with metadata about the new login to notify the user
-                return redirect()->route('auth')->with('error', "Another login detected. You have been logged out. New login from: {$location} using {$browser}.");
+                return redirect()->route('auth')->with([
+                    'error' => "Another login detected. You have been logged out. New login from: {$location} using {$browser}.",
+                    'avatar' => $avatar
+                ]);
             }
         }
 
