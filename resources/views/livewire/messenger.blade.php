@@ -76,6 +76,12 @@ new class extends Component {
     public function mount()
     {
         $this->profileName = auth()->user()->name;
+
+        if (request()->has('join')) {
+            $this->searchUserTag = request()->query('join');
+            $this->searchContact();
+            $this->dispatch('open-add-friend-modal');
+        }
     }
 
     public function updateProfile()
@@ -159,6 +165,13 @@ new class extends Component {
 
         $convo->setRelation('messages', $messages->getCollection()->reverse());
 
+        // Load participant public keys with string IDs to match JS auth()->id()
+        // We use fresh User queries to ensure we get the latest public_key from the database
+        $participants = User::whereIn('_id', $convo->participant_ids)->get(['_id', 'public_key']);
+        $convo->participant_public_keys = $participants->mapWithKeys(function ($user) {
+            return [(string) $user->_id => $user->public_key];
+        })->toArray();
+
         return $convo;
     }
 
@@ -241,17 +254,27 @@ new class extends Component {
      */
     public $messageBody = '';
 
-    public function messageUser()
+    public function messageUser($encryptedBody = null, $nonce = null, $encryptedKeys = null)
     {
-        if (trim($this->messageBody) === '' || !$this->selectedConversationId) {
+        if (!$this->selectedConversationId) {
+            return;
+        }
+
+        $body = $encryptedBody ?? $this->messageBody;
+        if (trim($body) === '') {
             return;
         }
 
         $message = Message::sendMessage([
             'conversation_id' => $this->selectedConversationId,
             'sender_id' => auth()->id(),
-            'body' => $this->messageBody,
+            'body' => $body,
             'type' => 'text',
+            'metadata' => [
+                'nonce' => $nonce,
+                'enc_keys' => $encryptedKeys,
+                'is_encrypted' => !!$encryptedKeys
+            ]
         ]);
 
         // Clear Input Box
@@ -272,6 +295,18 @@ new class extends Component {
             broadcast(new LoadContactList($notifyUser, auth()->id()))->toOthers();
         }
     }
+
+    public function savePublicKey(string $publicKey)
+    {
+        $user = User::find(auth()->id());
+        $user->update(['public_key' => $publicKey]);
+        
+        // Force re-evaluation of computed properties
+        unset($this->selectedConversation);
+        
+        // Refresh component state
+        $this->dispatch('$refresh');
+    }
 };
 
 ?>
@@ -285,7 +320,7 @@ new class extends Component {
         addFriendTab: 'id',
     
         init() {
-            let userId = '{{ auth()->id() }}';
+            let userId = @js((string) auth()->id());
             window.Echo.private('user.' + userId).listen('IncomingRequest', (e) => {
     
                 $wire.$refresh();
@@ -293,16 +328,15 @@ new class extends Component {
                 $wire.reloadContacts();
             });
         }
-    }" x-on:friend-request-sent.window="showAddFriend = false">
+    }" x-on:friend-request-sent.window="showAddFriend = false"
+    x-on:open-add-friend-modal.window="showAddFriend = true">
 
     <!-- NAVIGATION RAIL -->
     <div class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
 
         <div class="space-y-6 flex-1 flex flex-col items-center">
-            <div class="p-3 text-pink-500 mb-4">
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
-                </svg>
+            <div class="mb-4 w-full flex justify-center items-center px-0">
+                <img src="{{ asset('images/logo/SanCo.png') }}" class="w-full h-auto object-contain" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 2px rgba(255, 0, 127, 0.9));">
             </div>
 
             <button @click="activeTab = 'chats'; showSettings = false"
@@ -371,7 +405,7 @@ new class extends Component {
             </button>
 
             <a href="{{ route('logout') }}"
-                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('logout')); document.getElementById('logout-form').submit();"
                 class="p-3 text-[#71717a] hover:text-red-500 transition group relative inline-block cursor-pointer">
 
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
@@ -472,7 +506,7 @@ new class extends Component {
                 <button wire:click="selectConversation(null, '{{ $contact->_id }}' )"
                     wire:key="contact-{{ $contact->_id }}"
                     class="w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 group 
-                            {{ $this->selectedConversationId && in_array($contact->_id, $this->selectedConversation()?->participants ?? [])
+                            {{ $this->selectedConversationId && in_array($contact->_id, $this->selectedConversation?->participants ?? [])
                                 ? 'bg-[#202024] border border-white/5'
                                 : 'hover:bg-[#202024]/60 border border-transparent' }}">
 
@@ -521,7 +555,7 @@ new class extends Component {
     <!-- MAIN CHAT CANVAS -->
     <div class="flex-1 flex flex-col relative bg-[#09090b] z-10 w-full">
 
-        @if ($selected = $this->selectedConversation())
+        @if ($selected = $this->selectedConversation)
             @php
                 $selInfo = $selected->getDisplayInfo();
                 $isSelf = $selected->type === 'direct' && count($selected->participant_ids ?? []) === 1;
@@ -530,7 +564,24 @@ new class extends Component {
 
             <div
                 class="h-16 flex items-center justify-between px-6 py-4 bg-[#1e1e21]/80 backdrop-blur-md border-b border-[#2a2a2d] z-10 sticky top-0">
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4" x-data="{
+                    async syncMyKey() {
+                        const userId = @js((string) auth()->id());
+                        const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
+                        if (!mnemonic) {
+                            window.notyf.error('No recovery key found. Please generate one in Settings.');
+                            return;
+                        }
+                        
+                        try {
+                            const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                            await $wire.savePublicKey(keyPair.publicKey);
+                            window.notyf.success('Security keys synced!');
+                        } catch (e) {
+                            console.error('Manual sync failed:', e);
+                        }
+                    }
+                }">
                     <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 shadow-md">
                         <img src="{{ $selInfo['avatar'] }}" alt="{{ $selInfo['name'] }}"
                             class="w-full h-full object-cover">
@@ -541,7 +592,50 @@ new class extends Component {
                     }"
                         @presence-updated.window="isOnline = window.onlineUsers.includes('{{ $otherUserId }}')">
 
-                        <h2 class="text-white text-[15px] font-bold">{{ $selInfo['name'] }}</h2>
+                        <h2 class="text-white text-[15px] font-bold leading-tight">{{ $selInfo['name'] }}</h2>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            @php
+                                $myKey = $selected->participant_public_keys[auth()->id()] ?? null;
+                                $othersMissing = collect($selected->participant_public_keys)
+                                    ->forget(auth()->id())
+                                    ->contains(null);
+                                $allKeysSet = count($selected->participant_public_keys) > 0 && !collect($selected->participant_public_keys)->contains(null);
+                            @endphp
+
+                            @if ($allKeysSet)
+                                <span
+                                    class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                            clip-rule="evenodd" />
+                                    </svg>
+                                    Encrypted
+                                </span>
+                            @elseif(!$myKey)
+                                <button type="button" @click="syncMyKey()"
+                                    class="flex items-center gap-1 text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase tracking-wider transition-colors group/sec">
+                                    <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    Update Your Keys
+                                </button>
+                            @else
+                                <span class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    Standard (Waiting for keys)
+                                </span>
+                            @endif
+                            
+                            <span x-show="isOnline" class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider" style="display:none;">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span>
+                                Online
+                            </span>
+                        </div>
 
                         <p class="text-[11px] font-medium flex items-center gap-1.5">
                             @if ($isSelf)
@@ -582,7 +676,7 @@ new class extends Component {
             <div id="chat-messages-container" wire:key="conversation-{{ $selected->_id }}"
                 class="flex-1 overflow-y-auto py-6 custom-scrollbar bg-transparent flex flex-col text-left"
                 x-data="{
-                    convoId: '{{ $this->selectedConversationId }}',
+                    convoId: @js($this->selectedConversationId),
                 
                     init() {
                         // Scroll down immediately when opening the chat
@@ -657,7 +751,18 @@ new class extends Component {
                                             {{ $message->created_at->format('M j, g:i A') }}
                                         </span>
                                     </div>
-                                    <div class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full">{{ $message->body }}</div>
+                                    <div x-data="{
+                                        decryptedBody: @js($message->body),
+                                        async init() {
+                                            this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
+                                                @js($message->body),
+                                                @js($message->metadata),
+                                                @js((string) auth()->id())
+                                            );
+                                        }
+                                    }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
+                                        {{ $message->body }}
+                                    </div>
                                 </div>
                             </div>
                         @else
@@ -669,7 +774,18 @@ new class extends Component {
 
                                 {{-- Message Body --}}
                                 <div class="flex flex-col flex-1 min-w-0 text-left">
-                                    <div class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full">{{ $message->body }}</div>
+                                    <div x-data="{
+                                        decryptedBody: @js($message->body),
+                                        async init() {
+                                            this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
+                                                @js($message->body),
+                                                @js($message->metadata),
+                                                @js((string) auth()->id())
+                                            );
+                                        }
+                                    }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
+                                        {{ $message->body }}
+                                    </div>
                                 </div>
 
                                 {{-- Timestamp moved to the right, appearing on hover --}}
@@ -711,9 +827,10 @@ new class extends Component {
                             Messages</span>
                     </div>
                 @endif
-                <form wire:submit="messageUser" class="relative flex items-center gap-3" x-data="{
+                <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3" x-data="{
                     maxSize: 10 * 1024 * 1024, // 10MB
                     fileName: '',
+                    localBody: '',
                     handleFile(e) {
                         const file = e.target.files[0];
                         if (!file) {
@@ -732,11 +849,67 @@ new class extends Component {
                         document.getElementById('attachment-input').value = '';
                         this.fileName = '';
                     },
-                    clearOnSubmit() {
-                        this.removeFile();
+                    async encryptAndSend() {
+                        const body = this.localBody;
+                        if (!body || !body.trim()) return;
+
+                        let keys = @js($selected->participant_public_keys ?? []);
+                        const userId = @js((string) auth()->id());
+                        let privateKey = sessionStorage.getItem('e2e_private_' + userId);
+                        let publicKey = sessionStorage.getItem('e2e_public_' + userId);
+
+                        // Try to recover keys from localStorage if session is empty
+                        if (!privateKey || !publicKey) {
+                            const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
+                            if (mnemonic) {
+                                try {
+                                    const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                                    sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                                    sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                                    privateKey = keyPair.privateKey;
+                                    publicKey = keyPair.publicKey;
+                                } catch (e) {
+                                    console.error('Failed to recover keys:', e);
+                                }
+                            }
+                        }
+
+                        // PROACTIVE SYNC: If we have a public key locally but the server is missing it for US
+                        if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
+                            console.log('E2E: Syncing public key to server before sending...');
+                            await $wire.savePublicKey(publicKey);
+                            keys[userId] = publicKey;
+                        }
+
+                        // Check if we have public keys for ALL participants
+                        const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
+                        const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
+
+                        if (canEncrypt) {
+                            try {
+                                console.log('E2E: Encrypting message for ' + Object.keys(keys).length + ' recipient(s)...');
+                                const result = await window.EncryptionService.encryptMessage(body, keys, privateKey);
+                                await $wire.messageUser(result.encBody, result.nonce, result.keys);
+                                this.localBody = '';
+                                this.removeFile();
+                            } catch (e) {
+                                console.error('E2E Error during encryption:', e);
+                                alert('Encryption failed. Sending as standard message.');
+                                await $wire.messageUser(body); 
+                                this.localBody = '';
+                                this.removeFile();
+                            }
+                        } else {
+                            console.warn('E2E: Sending as standard text because keys are missing.', {
+                                hasPrivateKey: !!privateKey,
+                                missingFrom: participantsMissingKeys.map(p => p[0])
+                            });
+                            await $wire.messageUser(body);
+                            this.localBody = '';
+                            this.removeFile();
+                        }
                     }
-                }"
-                    @submit="clearOnSubmit">
+                }">
 
                     <div>
                         <input type="file" id="attachment-input" class="hidden" @change="handleFile">
@@ -764,7 +937,7 @@ new class extends Component {
                         </div>
                     </div>
 
-                    <input type="text" wire:model="messageBody" placeholder="Message {{ $selInfo['name'] }}..."
+                    <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
                         class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
                         autocomplete="off">
 
@@ -781,13 +954,8 @@ new class extends Component {
         @else
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-center space-y-4">
-                    <div class="p-6 bg-[#1e1e21] rounded-3xl inline-block border border-white/5 shadow-2xl">
-                        <svg class="w-12 h-12 text-pink-500/50 mx-auto" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
-                            </path>
-                        </svg>
+                    <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
+                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-white">Your Chat Canvas</h2>
@@ -810,8 +978,8 @@ new class extends Component {
 
         <div class="relative w-full max-w-md bg-[#1e1e21] rounded-3xl overflow-hidden shadow-2xl border border-white/5 p-6 md:p-8"
             x-data="{
-                tag: '{{ auth()->user()->user_tag ?? 'Not Set' }}',
-                link: 'https://telefon.app/j/{{ auth()->user()->user_tag ?? 'default' }}',
+                tag: @js(auth()->user()->user_tag ?? 'Not Set'),
+                link: @js(url('/j/' . (auth()->user()->user_tag ?? 'default'))),
                 copied: false,
                 copy(text) {
                     navigator.clipboard.writeText(text);
@@ -902,12 +1070,12 @@ new class extends Component {
                             @endif
                         </form>
                     </div>
-
+ 
                     <div class="w-1/2 flex-shrink-0 px-1">
                         <div class="space-y-6">
                             <div class="bg-pink-500/5 border border-pink-500/10 rounded-2xl p-5">
                                 <p class="text-sm text-[#a1a1aa] mb-4">Share this link with your friends to instantly
-                                    connect on Telefon.</p>
+                                    connect on SanCo.</p>
                                 <div class="flex items-center gap-2">
                                     <input type="text" readonly :value="link"
                                         class="flex-1 bg-[#18181b] border border-[#2a2a2d] rounded-xl px-4 py-3 text-xs text-[#71717a] outline-none">

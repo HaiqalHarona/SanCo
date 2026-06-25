@@ -4,9 +4,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'SanCo' }}</title>
 
     <script>
+        window.userId = '{{ auth()->id() }}';
+        window.userPublicKey = '{{ auth()->user()->public_key ?? '' }}';
+        window.newMasterKey = '{{ session('new_master_key') }}';
+
         // On page load or when changing themes, best to add inline in `head` to avoid FOUC
         const savedTheme = localStorage.getItem('theme') || 'dark';
         if (savedTheme === 'dark') {
@@ -59,7 +64,7 @@
             <div id="wire-session-success" class="hidden">{{ session('success') }}</div>
         @endif
         @if(session()->has('error'))
-            <div id="wire-session-error" class="hidden">{{ session('error') }}</div>
+            <div id="wire-session-error" class="hidden" data-avatar="{{ session('avatar') }}">{{ session('error') }}</div>
         @endif
     </div>
     <!-- Add theme-specific colors for text/bg when in light mode if not using Tailwind dark: classes everywhere -->

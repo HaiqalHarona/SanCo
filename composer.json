@@ -18,7 +18,7 @@
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^4.2",
         "livewire/volt": "^1.10",
-        "mongodb/laravel-mongodb": "^5.7"
+        "mongodb/laravel-mongodb": "5.7.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

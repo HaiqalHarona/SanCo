@@ -12,6 +12,15 @@ Route::get('/auth/{provider}/callback', [SocialController::class, 'callbackReque
 
 Route::middleware('auth')->group(function () {
     Volt::route('/chat', 'messenger')->name('messenger');
-    Route::view('/setup/master-key', 'setup.master-key')->name('setup.master-key');
     Route::post('/logout', [SocialController::class, 'logout'])->name('logout');
+    
+    Route::get('/j/{tag}', function ($tag) {
+        return redirect()->route('messenger', ['join' => $tag]);
+    })->name('join');
+    
+    Route::post('/api/save-public-key', function (Illuminate\Http\Request $request) {
+        $request->validate(['public_key' => 'required|string']);
+        auth()->user()->update(['public_key' => $request->public_key]);
+        return response()->json(['success' => true]);
+    })->name('api.save-public-key');
 });

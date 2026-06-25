@@ -53,11 +53,8 @@ layout('layouts.auth');
                 {{-- Sliding panel content --}}
                 <div class="relative z-10 flex flex-col justify-between h-full p-8 md:p-10">
                     {{-- Logo --}}
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-7 h-7 rounded-full bg-white/90 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-[#18181b]" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-                        </div>
-                        <span class="text-white font-semibold text-[15px] tracking-tight"></span>
+                    <div class="flex items-center gap-3">
+                
                     </div>
 
                     {{-- Center content --}}
@@ -116,6 +113,11 @@ layout('layouts.auth');
 
             {{-- ---- FORM AREA ---- --}}
             <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
+
+                {{-- Logo Placeholder --}}
+                <div class="flex justify-center -mb-14">
+                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-72 w-auto object-contain -my-14" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
+                </div>
 
                 {{-- Heading --}}
                 <div class="mb-10">

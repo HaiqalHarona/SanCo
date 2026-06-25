@@ -10,17 +10,44 @@
         activeTab: 'profile',
     
         // --- PROFILE DATA ---
-        profileImagePreview: '{{ auth()->user()->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode(auth()->user()->name) }}',
+        profileImagePreview: @js(auth()->user()->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode(auth()->user()->name)),
         cropper: null,
         showCropModal: false,
     
-        // --- SECURITY DATA (STATIC PLACEHOLDER) ---
+        // --- SECURITY DATA ---
         recoveryKey: '',
         isKeyVisible: false,
         keyCopied: false,
     
         initData() {
-            // Stripped out dynamic loading. Only using the placeholder above for UI testing.
+            const userId = window.userId;
+            if (userId) {
+                // Priority: Use the session's newMasterKey if it exists (first login), otherwise check localStorage
+                this.recoveryKey = window.newMasterKey || localStorage.getItem('e2e_recovery_' + userId) || '';
+            }
+        },
+    
+        async generateKey() {
+            if (this.recoveryKey && !confirm('Generating a new key will overwrite your current one. You will lose access to old encrypted messages unless you have the old key saved. Continue?')) {
+                return;
+            }
+            
+            const newKey = await $wire.generateNewKey();
+            if (newKey) {
+                const userId = window.userId;
+                localStorage.setItem('e2e_recovery_' + userId, newKey);
+                this.recoveryKey = newKey;
+                
+                // Trigger key derivation
+                const keyPair = await window.EncryptionService.deriveKeyPair(newKey);
+                sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                
+                // Sync to server via Livewire
+                await $wire.savePublicKey(keyPair.publicKey);
+                
+                window.notyf.success('New Recovery Key generated and synced!');
+            }
         },
     
         initCropper(imageElement) {
@@ -69,6 +96,25 @@
         },
     
         // --- SECURITY FUNCTIONS ---
+        async syncLocalKeyToServer() {
+            const userId = window.userId;
+            const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
+            if (!mnemonic) {
+                window.notyf.error('No local key found to sync.');
+                return;
+            }
+            
+            try {
+                const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                await $wire.savePublicKey(keyPair.publicKey);
+                window.notyf.success('Keys synced to server!');
+                this.recoveryKey = mnemonic;
+            } catch (e) {
+                console.error('Manual sync failed:', e);
+                window.notyf.error('Sync failed. See console.');
+            }
+        },
+
         copyRecoveryKey() {
             if (!this.recoveryKey) return;
             navigator.clipboard.writeText(this.recoveryKey);
@@ -215,17 +261,28 @@
                             </div>
 
                             {{-- Status Badge --}}
-                            @if (auth()->user()->master_key)
-                                <span
-                                    class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
-                                    Active
-                                </span>
-                            @else
-                                <span
-                                    class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
-                                    Not Setup
-                                </span>
-                            @endif
+                            <div class="flex items-center gap-2">
+                                @if (auth()->user()->master_key && auth()->user()->public_key)
+                                    <span
+                                        class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                        Active & Synced
+                                    </span>
+                                @elseif(auth()->user()->master_key)
+                                    <span
+                                        class="bg-amber-500/10 text-amber-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                        Needs Sync
+                                    </span>
+                                    <button type="button" @click="syncLocalKeyToServer()"
+                                        class="text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase underline">
+                                        Sync Now
+                                    </button>
+                                @else
+                                    <span
+                                        class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
+                                        Not Setup
+                                    </span>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
@@ -249,10 +306,15 @@
                             </div>
 
                             {{-- EMPTY STATE --}}
-                            <p x-show="!recoveryKey" class="text-gray-400 dark:text-gray-500 tracking-widest text-xs"
-                                x-cloak>
-                                NO KEY FOUND
-                            </p>
+                            <div x-show="!recoveryKey" class="flex flex-col items-center gap-4" x-cloak>
+                                <p class="text-gray-400 dark:text-gray-500 tracking-widest text-xs">
+                                    NO KEY FOUND
+                                </p>
+                                <button type="button" @click="generateKey()"
+                                    class="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md">
+                                    Generate New Key
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
