@@ -4,96 +4,72 @@ import { Notyf } from "notyf";
 
 window.onlineUsers = [];
 
-// Handle E2E Key derivation on load
-document.addEventListener('DOMContentLoaded', async () => {
-    const userId = window.userId; 
-    if (userId) {
-        // Automatically save new master key if provided (silent setup)
-        if (window.newMasterKey && !localStorage.getItem('e2e_recovery_' + userId)) {
-            const mnemonic = window.newMasterKey;
-            localStorage.setItem('e2e_recovery_' + userId, mnemonic);
-            console.log('New Master Key saved to localStorage.');
+// Helper: sync a public key to the server via Livewire or API fallback
+// Must be called AFTER livewire:init so the component registry is populated
+window._syncPublicKeyToServer = async (publicKey) => {
+    try {
+        const messengerEl = document.querySelector('[wire\\:id]');
+        if (messengerEl && window.Livewire) {
+            const messenger = window.Livewire.find(messengerEl.getAttribute('wire:id'));
+            if (messenger) {
+                await messenger.savePublicKey(publicKey);
+                console.log('E2E: Public key synced via Livewire.');
+                return true;
+            }
+        }
+        // Fallback to API if Livewire component not found
+        await fetch('/api/save-public-key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            body: JSON.stringify({ public_key: publicKey })
+        });
+        console.log('E2E: Public key synced via API.');
+        return true;
+    } catch (e) {
+        console.error('E2E: Failed to sync public key:', e);
+        return false;
+    }
+};
 
-            // Immediately derive and sync public key so encryption works on first message
+// Handle E2E key derivation AFTER Livewire has initialized so the component
+// registry is populated and savePublicKey calls don't silently fail.
+document.addEventListener('livewire:init', async () => {
+    const userId = window.userId;
+    if (!userId) return;
+
+    // If this is a brand-new account, persist the session-provided master key
+    if (window.newMasterKey && !localStorage.getItem('e2e_recovery_' + userId)) {
+        localStorage.setItem('e2e_recovery_' + userId, window.newMasterKey);
+        console.log('E2E: New master key saved to localStorage.');
+    }
+
+    // Re-derive keys from localStorage if sessionStorage is empty (e.g. new tab / session wipe)
+    let privateKey = sessionStorage.getItem('e2e_private_' + userId);
+    let publicKey  = sessionStorage.getItem('e2e_public_'  + userId);
+
+    if (!privateKey || !publicKey) {
+        const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
+        if (mnemonic) {
             try {
                 const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
                 sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
-                sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
-                
-                // Use the Livewire component if available on page, otherwise fallback to fetch
-                const messenger = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
-                if (messenger) {
-                    await messenger.savePublicKey(keyPair.publicKey);
-                    console.log('Public key synced via Livewire.');
-                } else {
-                    await fetch('/api/save-public-key', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                        },
-                        body: JSON.stringify({ public_key: keyPair.publicKey })
-                    });
-                    console.log('Public key synced via API.');
-                }
+                sessionStorage.setItem('e2e_public_'  + userId, keyPair.publicKey);
+                privateKey = keyPair.privateKey;
+                publicKey  = keyPair.publicKey;
+                console.log('E2E: Keys derived and stored in sessionStorage.');
             } catch (e) {
-                console.error('Initial key sync failed:', e);
+                console.error('E2E: Failed to derive keys from mnemonic:', e);
             }
         }
+    }
 
-        let privateKey = sessionStorage.getItem('e2e_private_' + userId);
-        let publicKey = sessionStorage.getItem('e2e_public_' + userId);
-
-        if (!privateKey || !publicKey) {
-            const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
-            if (mnemonic) {
-                try {
-                    const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
-                    sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
-                    sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
-                    privateKey = keyPair.privateKey;
-                    publicKey = keyPair.publicKey;
-                    console.log('E2E keys derived and stored in session.');
-                } catch (e) {
-                    console.error('Failed to derive keys from mnemonic:', e);
-                }
-            }
-        }
-
-        // Sync public key to server if missing OR to ensure consistency
-        if (publicKey) {
-            try {
-                const syncToDB = async (publicKey) => {
-                    const messengerEl = document.querySelector('[wire\\:id]');
-                    if (messengerEl && window.Livewire) {
-                        const messenger = window.Livewire.find(messengerEl.getAttribute('wire:id'));
-                        if (messenger) {
-                            await messenger.savePublicKey(publicKey);
-                            console.log('Public key synced via Livewire.');
-                            return true;
-                        }
-                    }
-
-                    await fetch('/api/save-public-key', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                        },
-                        body: JSON.stringify({ public_key: publicKey })
-                    });
-                    console.log('Public key synced via API.');
-                    return true;
-                };
-
-                // If server doesn't have it, or we just want to be sure
-                if (!window.userPublicKey || window.userPublicKey === '') {
-                    await syncToDB(publicKey);
-                }
-            } catch (e) {
-                console.error('Failed to sync public key:', e);
-            }
-        }
+    // Always sync the local public key to the server to guarantee DB consistency.
+    // This covers: new accounts, session restores, and cases where a previous sync failed.
+    if (publicKey) {
+        await window._syncPublicKeyToServer(publicKey);
     }
 });
 
@@ -312,15 +288,21 @@ window.addEventListener('logout', () => {
         sessionStorage.removeItem('e2e_private_' + userId);
         sessionStorage.removeItem('e2e_public_' + userId);
     }
-    // Also clear general keys just in case
+    // Also clear general keys just in case.
+    // Snapshot keys first to avoid mutating the collection while iterating.
+    const lsKeysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key.startsWith('e2e_recovery_')) localStorage.removeItem(key);
+        if (key && key.startsWith('e2e_recovery_')) lsKeysToRemove.push(key);
     }
+    lsKeysToRemove.forEach(k => localStorage.removeItem(k));
+
+    const ssKeysToRemove = [];
     for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if (key.startsWith('e2e_private_') || key.startsWith('e2e_public_')) sessionStorage.removeItem(key);
+        if (key && (key.startsWith('e2e_private_') || key.startsWith('e2e_public_'))) ssKeysToRemove.push(key);
     }
+    ssKeysToRemove.forEach(k => sessionStorage.removeItem(k));
 });
 
 document.addEventListener('livewire:init', () => {
