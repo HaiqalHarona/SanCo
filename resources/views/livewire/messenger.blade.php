@@ -144,9 +144,9 @@ new class extends Component {
     {
         if (!$id && $userId) {
             $convo = Conversation::findOrCreateDirect(auth()->id(), $userId);
-            $this->selectedConversationId = $convo->_id;
+            $this->selectedConversationId = (string) $convo->_id;
         } else {
-            $this->selectedConversationId = $id;
+            $this->selectedConversationId = (string) $id;
         }
 
         $this->dispatch('scroll-bottom');
@@ -358,7 +358,11 @@ new class extends Component {
 
         <div class="space-y-6 flex-1 flex flex-col items-center">
             <div class="mb-4 w-full flex justify-center items-center px-0">
-                <img src="{{ asset('images/logo/SanCo.png') }}" class="w-full h-auto object-contain" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 2px rgba(255, 0, 127, 0.9));">
+                <div class="p-2.5 text-pink-500 flex items-center justify-center">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                </div>
             </div>
 
             <button @click="activeTab = 'chats'; showSettings = false"
@@ -532,8 +536,8 @@ new class extends Component {
                                 ? 'bg-[#202024] border border-white/5'
                                 : 'hover:bg-[#202024]/60 border border-transparent' }}">
 
-                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.includes('{{ $contact->_id }}') }"
-                        @presence-updated.window="isOnline = window.onlineUsers.includes('{{ $contact->_id }}')">
+                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.has('{{ $contact->_id }}') }"
+                        @presence-updated.window="isOnline = window.onlineUsers.has('{{ $contact->_id }}')">
 
                         <img src="{{ $contact->avatar ?? 'https://ui-avatars.com/api/?size=100&background=3f3f46&color=fff&name=' . urlencode($contact->name) }}"
                             referrerpolicy="no-referrer"
@@ -610,9 +614,9 @@ new class extends Component {
                     </div>
 
                     <div wire:key="header-presence-{{ $otherUserId }}" x-data="{
-                        isOnline: window.onlineUsers.includes('{{ $otherUserId }}')
+                        isOnline: window.onlineUsers.has('{{ $otherUserId }}')
                     }"
-                        @presence-updated.window="isOnline = window.onlineUsers.includes('{{ $otherUserId }}')">
+                        @presence-updated.window="isOnline = window.onlineUsers.has('{{ $otherUserId }}')">
 
                         <h2 class="text-white text-[15px] font-bold leading-tight">{{ $selInfo['name'] }}</h2>
                         <div class="flex items-center gap-2 mt-0.5">
@@ -893,7 +897,7 @@ new class extends Component {
                     // ── Initialization ───────────────────────────────────────────────────
                     // The PHP selectedConversation() computed property already queries participant
                     // public keys as part of loading the conversation — that data is available in
-                    // @js() for free. Seed the cache from it so the first send costs nothing.
+                    // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
                     init() {
                         const renderKeys = @js($selected->participant_public_keys ?? []);
                         if (renderKeys && Object.keys(renderKeys).length > 0) {
@@ -1034,7 +1038,7 @@ new class extends Component {
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-center space-y-4">
                     <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
-                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
+                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo">
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-white">Your Chat Canvas</h2>

@@ -115,8 +115,8 @@ layout('layouts.auth');
             <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
 
                 {{-- Logo Placeholder --}}
-                <div class="flex justify-center -mb-14">
-                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-72 w-auto object-contain -my-14" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
+                <div class="flex justify-center -mb-6 -mt-10">
+                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-72 w-auto object-contain -my-10" alt="SanCo Logo">
                 </div>
 
                 {{-- Heading --}}

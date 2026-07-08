@@ -206,3 +206,105 @@ To ensure both Alice and Bob can see each other in their "Friends" list with hig
 - **Mutual Friendships**: A mutual friendship is represented by TWO documents (one per side).
 - **Single Document States**: Pending/blocked states only need ONE document from the initiator.
 - **Atomic Operations**: Uses MongoDB's atomic operations for data integrity.
+
+---
+
+## API Development & Testing Guide
+
+To build and test the API for React Native mobile consumption:
+
+### 1. Sanctum Setup
+Enable Laravel Sanctum in the application. Issue token access by including the `Laravel\Sanctum\HasApiTokens` trait on the [User](file:///C:/Users/johan/Desktop/Laravel/SanCo/app/Models/User.php) model (already present).
+
+Ensure the API middleware handles token authentication statefully by using the `auth:sanctum` guard on protected API routes inside [routes/api.php](file:///C:/Users/johan/Desktop/Laravel/SanCo/routes/api.php).
+
+### 2. Testing the API
+* **Automated Feature Tests**:
+  Create testing suites under `tests/Feature` using:
+  ```bash
+  php artisan make:test Api/ChatTest
+  ```
+  Inside the test, authenticate requests using Sanctum:
+  ```php
+  $user = User::factory()->create();
+  $this->actingAs($user, 'sanctum')
+       ->getJson('/api/conversations')
+       ->assertStatus(200);
+  ```
+* **Postman / cURL Manual Testing**:
+  1. Call `POST /api/login` with user credentials.
+  2. Copy the returned `token` string.
+  3. Include the token in subsequent HTTP headers:
+     `Authorization: Bearer <your_token>`
+     `Accept: application/json`
+
+---
+
+## Proposed Mobile API Routes (`routes/api.php`)
+
+All routes (except Login and Register) require authentication using the `auth:sanctum` guard.
+
+### 1. Authentication Endpoints
+* **`POST /api/register`**:
+  * **Payload**: `name`, `email`, `password`, `password_confirmation`, `user_tag`
+  * **Response**: `user` object and `token` string.
+* **`POST /api/login`**:
+  * **Payload**: `email`, `password`
+  * **Response**: `user` object and `token` string.
+* **`POST /api/logout`**:
+  * **Payload**: None
+  * **Response**: `{ "success": true }` (revokes the current Sanctum token).
+
+### 2. User Profiles & Asymmetric Cryptography Keys
+* **`GET /api/user`**:
+  * **Response**: Logged-in user document (including `public_key`).
+* **`POST /api/user/public-key`**:
+  * **Payload**: `public_key` (Base64 Curve25519 Public Key)
+  * **Response**: `{ "success": true }` (Updates user's public key in MongoDB).
+* **`GET /api/conversations/{id}/keys`**:
+  * **Response**: JSON dictionary of `{ "user_id": "public_key_base64" }` for all participants in the conversation. Used by mobile clients to wrap symmetric keys before sending a message.
+
+### 3. Conversations Management
+* **`GET /api/conversations`**:
+  * **Response**: List of conversations representing the user's inbox (uses `Conversation::getInboxFor()`).
+* **`POST /api/conversations`**:
+  * **Payload**: `type` ("direct" or "group"), `recipient_id` (for direct) or `name` & `participant_ids` (for groups)
+  * **Response**: Conversation resource.
+
+### 4. End-to-End Encrypted Messaging
+* **`GET /api/conversations/{id}/messages`**:
+  * **Response**: Paginated messages in the conversation (uses `Message::getMessages()`).
+* **`POST /api/conversations/{id}/messages`**:
+  * **Payload**: 
+    - `type` ("text", "image", "file", etc.)
+    - `body` (Base64-encoded encrypted ciphertext string)
+    - `metadata`:
+      ```json
+      {
+        "is_encrypted": true,
+        "nonce": "base64_encoded_nonce",
+        "enc_keys": {
+          "user_id_1": "wrapped_symmetric_key_base64",
+          "user_id_2": "wrapped_symmetric_key_base64"
+        }
+      }
+      ```
+  * **Response**: Newly created Message object, and triggers the `MessageSent` broadcast event to peer devices.
+
+### 5. Friendships & Contacts Management
+* **`GET /api/friends`**:
+  * **Response**: List of accepted reciprocal friends.
+* **`GET /api/friends/pending`**:
+  * **Response**: Eager-loaded incoming friend requests.
+* **`POST /api/friends/request`**:
+  * **Payload**: `friend_id` (ID of user to add)
+  * **Response**: Friendship record.
+* **`POST /api/friends/accept`**:
+  * **Payload**: `sender_id`
+  * **Response**: `{ "success": true }`.
+* **`POST /api/friends/reject`**:
+  * **Payload**: `sender_id`
+  * **Response**: `{ "success": true }`.
+* **`POST /api/friends/block`**:
+  * **Payload**: `blocked_id`
+  * **Response**: `{ "success": true }`.

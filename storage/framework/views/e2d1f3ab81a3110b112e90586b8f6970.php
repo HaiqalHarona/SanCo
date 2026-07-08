@@ -18,6 +18,8 @@
         recoveryKey: '',
         isKeyVisible: false,
         keyCopied: false,
+        importKeyInput: '',
+        showImportInput: false,
     
         initData() {
             const userId = window.userId;
@@ -120,6 +122,42 @@
             navigator.clipboard.writeText(this.recoveryKey);
             this.keyCopied = true;
             setTimeout(() => this.keyCopied = false, 2000);
+        },
+
+        async importKey() {
+            const trimmedKey = this.importKeyInput.trim();
+            if (!trimmedKey) {
+                window.notyf.error('Please enter a recovery key.');
+                return;
+            }
+            
+            const words = trimmedKey.split(/\s+/);
+            if (words.length < 12) {
+                window.notyf.error('Invalid recovery key format. It should be a 12 or 24-word seed phrase.');
+                return;
+            }
+
+            try {
+                const userId = window.userId;
+                const keyPair = await window.EncryptionService.deriveKeyPair(trimmedKey);
+                
+                localStorage.setItem('e2e_recovery_' + userId, trimmedKey);
+                sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                
+                this.recoveryKey = trimmedKey;
+                this.showImportInput = false;
+                this.importKeyInput = '';
+                
+                await $wire.savePublicKey(keyPair.publicKey);
+                
+                window.notyf.success('Recovery Key imported successfully! Refreshing...');
+                
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (e) {
+                console.error('Import key failed:', e);
+                window.notyf.error('Failed to import recovery key. Please check the phrase.');
+            }
         }
     }" x-init="initData()" x-cloak>
 
@@ -306,14 +344,41 @@
                             </div>
 
                             
-                            <div x-show="!recoveryKey" class="flex flex-col items-center gap-4" x-cloak>
-                                <p class="text-gray-400 dark:text-gray-500 tracking-widest text-xs">
-                                    NO KEY FOUND
-                                </p>
-                                <button type="button" @click="generateKey()"
-                                    class="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md">
-                                    Generate New Key
-                                </button>
+                            <div x-show="!recoveryKey" class="flex flex-col items-center w-full gap-4" x-cloak>
+                                <div x-show="!showImportInput" class="flex flex-col items-center gap-4">
+                                    <p class="text-gray-400 dark:text-gray-500 tracking-widest text-xs">
+                                        NO KEY FOUND
+                                    </p>
+                                    <div class="flex gap-3">
+                                        <button type="button" @click="generateKey()"
+                                            class="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md">
+                                            Generate New Key
+                                        </button>
+                                        <button type="button" @click="showImportInput = true"
+                                            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[#2a2a2d] dark:hover:bg-[#343438] text-gray-700 dark:text-[#a1a1aa] text-xs font-bold rounded-lg transition-all border border-gray-200 dark:border-white/10 shadow-md">
+                                            Import Existing Key
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div x-show="showImportInput" class="w-full flex flex-col gap-3" x-cloak>
+                                    <p class="text-gray-400 dark:text-gray-500 tracking-wider text-[11px] font-bold uppercase text-left">
+                                        Enter your 12 or 24-word recovery key:
+                                    </p>
+                                    <textarea x-model="importKeyInput" rows="3"
+                                        class="w-full bg-gray-50 dark:bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-xl p-3 text-sm text-gray-900 dark:text-pink-500 font-mono focus:outline-none focus:ring-1 focus:ring-pink-500"
+                                        placeholder="word1 word2 word3 ..."></textarea>
+                                    <div class="flex justify-end gap-2">
+                                        <button type="button" @click="showImportInput = false; importKeyInput = ''"
+                                            class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-[#2a2a2d] dark:hover:bg-[#343438] text-gray-700 dark:text-[#a1a1aa] text-xs font-bold rounded-lg transition-all">
+                                            Cancel
+                                        </button>
+                                        <button type="button" @click="importKey()"
+                                            class="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md">
+                                            Import Key
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -2,7 +2,7 @@ import "./bootstrap";
 import "./encrypt";
 import { Notyf } from "notyf";
 
-window.onlineUsers = [];
+window.onlineUsers = new Set();
 
 // Helper: sync a public key to the server via Livewire or API fallback
 // Must be called AFTER livewire:init so the component registry is populated
@@ -308,17 +308,17 @@ window.addEventListener('logout', () => {
 document.addEventListener('livewire:init', () => {
     window.Echo.join('presence.chat')
         .here((users) => {
-            window.onlineUsers = users.map(user => user.id);
+            window.onlineUsers = new Set(users.map(user => user.id));
             triggerPresenceUpdate();
         })
         .joining((user) => {
-            if (!window.onlineUsers.includes(user.id)) {
-                window.onlineUsers.push(user.id);
+            if (!window.onlineUsers.has(user.id)) {
+                window.onlineUsers.add(user.id);
                 triggerPresenceUpdate();
             }
         })
         .leaving((user) => {
-            window.onlineUsers = window.onlineUsers.filter(id => id !== user.id);
+            window.onlineUsers.delete(user.id);
             triggerPresenceUpdate();
         });
 });

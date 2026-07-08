@@ -40,7 +40,11 @@ use App\Events\LoadContactList;
 
         <div class="space-y-6 flex-1 flex flex-col items-center">
             <div class="mb-4 w-full flex justify-center items-center px-0">
-                <img src="<?php echo e(asset('images/logo/SanCo.png')); ?>" class="w-full h-auto object-contain" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 2px rgba(255, 0, 127, 0.9));">
+                <div class="p-2.5 text-pink-500 flex items-center justify-center">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                </div>
             </div>
 
             <button @click="activeTab = 'chats'; showSettings = false"
@@ -215,8 +219,8 @@ use App\Events\LoadContactList;
                                 ? 'bg-[#202024] border border-white/5'
                                 : 'hover:bg-[#202024]/60 border border-transparent'); ?>">
 
-                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.includes('<?php echo e($contact->_id); ?>') }"
-                        @presence-updated.window="isOnline = window.onlineUsers.includes('<?php echo e($contact->_id); ?>')">
+                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.has('<?php echo e($contact->_id); ?>') }"
+                        @presence-updated.window="isOnline = window.onlineUsers.has('<?php echo e($contact->_id); ?>')">
 
                         <img src="<?php echo e($contact->avatar ?? 'https://ui-avatars.com/api/?size=100&background=3f3f46&color=fff&name=' . urlencode($contact->name)); ?>"
                             referrerpolicy="no-referrer"
@@ -295,9 +299,9 @@ use App\Events\LoadContactList;
                     </div>
 
                     <div <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'header-presence-'.e($otherUserId).''; ?>wire:key="header-presence-<?php echo e($otherUserId); ?>" x-data="{
-                        isOnline: window.onlineUsers.includes('<?php echo e($otherUserId); ?>')
+                        isOnline: window.onlineUsers.has('<?php echo e($otherUserId); ?>')
                     }"
-                        @presence-updated.window="isOnline = window.onlineUsers.includes('<?php echo e($otherUserId); ?>')">
+                        @presence-updated.window="isOnline = window.onlineUsers.has('<?php echo e($otherUserId); ?>')">
 
                         <h2 class="text-white text-[15px] font-bold leading-tight"><?php echo e($selInfo['name']); ?></h2>
                         <div class="flex items-center gap-2 mt-0.5">
@@ -562,6 +566,37 @@ use App\Events\LoadContactList;
                         document.getElementById('attachment-input').value = '';
                         this.fileName = '';
                     },
+
+                    // ── Key Cache ────────────────────────────────────────────────────────
+                    // Participant public keys are nearly static (only change on explicit key
+                    // regeneration). Caching them in sessionStorage avoids a Livewire round-
+                    // trip + MongoDB query on every single message send.
+                    // Cache is keyed by conversationId so switching conversations is isolated.
+                    _convId: <?php echo \Illuminate\Support\Js::from((string) $this->selectedConversationId ?? '')->toHtml() ?>,
+                    _cacheKey() { return 'e2e_keys_' + this._convId; },
+                    _readKeyCache() {
+                        try {
+                            const v = sessionStorage.getItem(this._cacheKey());
+                            return v ? JSON.parse(v) : null;
+                        } catch { return null; }
+                    },
+                    _writeKeyCache(keys) {
+                        try { sessionStorage.setItem(this._cacheKey(), JSON.stringify(keys)); }
+                        catch (e) { console.warn('E2E: Key cache write failed:', e); }
+                    },
+
+                    // ── Initialization ───────────────────────────────────────────────────
+                    // The PHP selectedConversation() computed property already queries participant
+                    // public keys as part of loading the conversation — that data is available in
+                    // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
+                    init() {
+                        const renderKeys = <?php echo \Illuminate\Support\Js::from($selected->participant_public_keys ?? [])->toHtml() ?>;
+                        if (renderKeys && Object.keys(renderKeys).length > 0) {
+                            this._writeKeyCache(renderKeys);
+                        }
+                    },
+
+                    // ── Main send ────────────────────────────────────────────────────────
                     async encryptAndSend() {
                         const body = this.localBody;
                         if (!body || !body.trim()) return;
@@ -570,7 +605,7 @@ use App\Events\LoadContactList;
                         let privateKey = sessionStorage.getItem('e2e_private_' + userId);
                         let publicKey  = sessionStorage.getItem('e2e_public_'  + userId);
 
-                        // Recover keys from localStorage if sessionStorage is empty (new tab/session wipe)
+                        // Recover keys from mnemonic if sessionStorage is empty (new tab / session wipe)
                         if (!privateKey || !publicKey) {
                             const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
                             if (mnemonic) {
@@ -580,8 +615,6 @@ use App\Events\LoadContactList;
                                     sessionStorage.setItem('e2e_public_'  + userId, keyPair.publicKey);
                                     privateKey = keyPair.privateKey;
                                     publicKey  = keyPair.publicKey;
-
-                                    // Sync the recovered key to the server
                                     if (window._syncPublicKeyToServer) {
                                         await window._syncPublicKeyToServer(publicKey);
                                     }
@@ -591,29 +624,37 @@ use App\Events\LoadContactList;
                             }
                         }
 
-                        // Always fetch fresh participant public keys from the server
-                        // to avoid using the stale <?php echo \Illuminate\Support\Js::from()->toHtml() ?>-baked snapshot from render time.
-                        let keys = {};
-                        try {
-                            // getParticipantKeys returns the current public_key map for this conversation
-                            keys = await $wire.getParticipantKeys();
-                        } catch (e) {
-                            console.error('E2E: Failed to fetch participant keys:', e);
-                            // Fallback to the render-time snapshot
-                            keys = <?php echo \Illuminate\Support\Js::from($selected->participant_public_keys ?? [])->toHtml() ?>;
+                        // Cache-first key resolution:
+                        //   HIT  (all keys non-null) → use cache, zero server round-trips.
+                        //   MISS (cache empty or any key is null) → call getParticipantKeys(),
+                        //        write result back to cache, all future sends are free.
+                        let keys = this._readKeyCache();
+                        const cacheComplete = keys
+                            && Object.keys(keys).length > 0
+                            && Object.values(keys).every(k => !!k);
+
+                        if (!cacheComplete) {
+                            console.log('E2E: Key cache miss — fetching fresh keys from server.');
+                            try {
+                                keys = await $wire.getParticipantKeys();
+                                this._writeKeyCache(keys);
+                            } catch (e) {
+                                console.error('E2E: Failed to fetch participant keys:', e);
+                                keys = keys || <?php echo \Illuminate\Support\Js::from($selected->participant_public_keys ?? [])->toHtml() ?>;
+                            }
                         }
 
-                        // If our own key is missing from the server map but we have it locally, inject it.
-                        // This handles the case where the server hasn't received our public key yet.
+                        // If our own key is missing from the map (e.g. previous sync failed or
+                        // key was just regenerated), inject it and push to server.
                         if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
-                            console.warn('E2E: Sender key missing from server keys map, injecting local key and syncing...');
+                            console.warn('E2E: Own key mismatch — syncing to server.');
                             if (window._syncPublicKeyToServer) {
                                 await window._syncPublicKeyToServer(publicKey);
                             }
                             keys[userId] = publicKey;
+                            this._writeKeyCache(keys); // keep cache consistent
                         }
 
-                        // Check if we have public keys for ALL participants
                         const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
                         const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
 
@@ -627,12 +668,12 @@ use App\Events\LoadContactList;
                             } catch (e) {
                                 console.error('E2E Error during encryption:', e);
                                 alert('Encryption failed. Sending as standard message.');
-                                await $wire.messageUser(body); 
+                                await $wire.messageUser(body);
                                 this.localBody = '';
                                 this.removeFile();
                             }
                         } else {
-                            console.warn('E2E: Sending as standard text because keys are missing.', {
+                            console.warn('E2E: Sending as standard text — keys missing.', {
                                 hasPrivateKey: !!privateKey,
                                 missingFrom: participantsMissingKeys.map(p => p[0])
                             });
@@ -642,6 +683,7 @@ use App\Events\LoadContactList;
                         }
                     }
                 }">
+
 
                     <div>
                         <input type="file" id="attachment-input" class="hidden" @change="handleFile">
@@ -687,7 +729,7 @@ use App\Events\LoadContactList;
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-center space-y-4">
                     <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
-                        <img src="<?php echo e(asset('images/logo/SanCo.png')); ?>" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
+                        <img src="<?php echo e(asset('images/logo/SanCo.png')); ?>" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo">
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-white">Your Chat Canvas</h2>

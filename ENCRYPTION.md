@@ -1,27 +1,61 @@
 # End-to-End Encryption (E2EE) System Documentation
 
-This project implements a robust End-to-End Encryption (E2EE) system using **BIP39 mnemonics** for key derivation and **libsodium** for cryptographic operations. This ensures that only the intended[...]
+SanCo implements a secure, zero-knowledge End-to-End Encryption (E2EE) system. This document outlines the cryptographic primitives, key management, message transport lifecycle, and security design details of the system.
 
 ---
 
-## 1. Technology Stack
-- **Library**: `libsodium-wrappers` (High-level cryptographic library)
-- **Key Derivation**: `bip39` (Generates 24-word recovery phrases)
-- **Polyfills**: `buffer` (Required for BIP39 in browser environments)
+## 1. Cryptographic Primitives & Technology Stack
+
+The application uses standard, proven cryptographic algorithms via high-performance libraries to secure all communications:
+
+- **Cryptographic Engine**: [`libsodium-wrappers`](https://github.com/jedisct1/libsodium-js) (WebAssembly-compiled Libsodium).
+- **Key Derivation (KDF)**: BIP39 standard (24-word recovery phrase) for user-friendly mnemonic generation and keypair derivation.
+- **Asymmetric Key Exchange / Key Wrapping**: Curve25519 anonymous sealed boxes (`crypto_box_seal`) to securely transmit symmetric keys to multiple recipients without exposing sender identity.
+- **Symmetric Encryption**: XSalsa20 stream cipher combined with Poly1305 MAC (`crypto_secretbox_easy`) for high-speed, authenticated symmetric message encryption.
+- **Polyfills**: `buffer` polyfill (required for BIP39 mnemonic validation and synchronization in browser environments).
 
 ---
 
-## 2. Key Management Logic
+## 2. Key Management & Storage Architecture
 
-### Generation and Derivation
-The system derives a cryptographic keypair from a 24-word mnemonic. 
+SanCo manages keys across three distinct layers, balancing security, convenience, and performance:
 
-**Code: `resources/js/encrypt.js`**
+```
++----------------------------------------------------------------------------+
+|                          1. Master Mnemonic                                |
+|  - 24-word BIP39 Recovery Phrase                                           |
+|  - Saved in localStorage ('e2e_recovery_{userId}')                         |
+|  - Hashed server-side (bcrypt) for user recovery verification              |
++----------------------------------------------------------------------------+
+                                      |
+                                      v (Derivation)
++----------------------------------------------------------------------------+
+|                       2. Active Session Keypair                            |
+|  - Derived on page load / session initialization                           |
+|  - Curve25519 Public Key (Uploaded to MongoDB)                             |
+|  - Curve25519 Private Key (Stays in sessionStorage: 'e2e_private_{userId}')|
++----------------------------------------------------------------------------+
+                                      |
+                                      v (Message Send)
++----------------------------------------------------------------------------+
+|                       3. Message-Specific Symmetric Key                    |
+|  - Ephemeral 256-bit symmetric key (randomly generated per-message)        |
+|  - Never written to persistent storage                                     |
+|  - Encrypted for each recipient using their Curve25519 Public Key          |
++----------------------------------------------------------------------------+
+```
+
+### 2.1 Key Derivation Logic (`resources/js/encrypt.js`)
+When a user logs in or regenerates their keys, the client derives the keypair from their 24-word BIP39 recovery phrase:
+
 ```javascript
 async deriveKeyPair(mnemonic) { 
     await this.init();
+    // 1. Convert the 24-word phrase into a 512-bit seed
     const seed = bip39.mnemonicToSeedSync(mnemonic);
-    const seed32 = seed.slice(0, 32); // Use first 32 bytes
+    // 2. Extract the first 32 bytes (256 bits) to use as the seed for Curve25519
+    const seed32 = seed.slice(0, 32); 
+    // 3. Derive public and private keypair
     const keyPair = this.sodium.crypto_box_seed_keypair(seed32);
     
     return {
@@ -31,12 +65,14 @@ async deriveKeyPair(mnemonic) {
 }
 ```
 
-### Storage and Security
-- **Mnemonic**: Stored in `localStorage` as `e2e_recovery_{userId}`.
-- **Keys**: Derived public/private keys live only in `sessionStorage` during the active session.
-- **Cleanup (Logout)**: When a user logs out, all sensitive storage is purged.
+### 2.2 Storage Lifetimes & Isolation
+- **`localStorage`**: Stores `e2e_recovery_{userId}` containing the plaintext BIP39 mnemonic. This persists across tabs and browser restarts, preventing the user from needing to re-enter their recovery phrase every time they visit.
+- **`sessionStorage`**: Stores the derived `e2e_private_{userId}` and `e2e_public_{userId}` keys (Base64-encoded). This ensures that the private key exists only during the lifetime of the browser tab and is destroyed when the tab is closed.
+- **`sessionStorage` Cache**: Stores cached participant public keys under `e2e_keys_{conversationId}` to prevent costly database queries and API calls on every keystroke.
 
-**Code: `resources/js/app.js`**
+### 2.3 Automated Session Scrubbing (Logout / Terminate)
+To prevent key leakage across multiple users on shared devices, any logout action or session termination triggers a browser-wide event to scrub all E2E artifacts:
+
 ```javascript
 window.addEventListener('logout', () => {
     const userId = window.userId;
@@ -45,51 +81,74 @@ window.addEventListener('logout', () => {
         sessionStorage.removeItem('e2e_private_' + userId);
         sessionStorage.removeItem('e2e_public_' + userId);
     }
-    // Scrub all E2E keys to prevent cross-account leakage
+    // Scrub all other E2E storage to prevent cross-account leakage
+    const lsKeysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key.startsWith('e2e_recovery_')) localStorage.removeItem(key);
+        if (key && key.startsWith('e2e_recovery_')) lsKeysToRemove.push(key);
     }
+    lsKeysToRemove.forEach(k => localStorage.removeItem(k));
+
+    const ssKeysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('e2e_private_') || key.startsWith('e2e_public_'))) ssKeysToRemove.push(key);
+    }
+    ssKeysToRemove.forEach(k => sessionStorage.removeItem(k));
 });
 ```
 
+### 2.4 Cryptographic Keys Demystified: Role and Locking Mechanics
+
+To understand how the messaging content is locked (encrypted) and unlocked (decrypted), it is helpful to look at the roles and locations of the four cryptographic keys involved:
+
+| Key Type | What It Is | Stored Location | Locking / Unlocking Mechanics |
+| :--- | :--- | :--- | :--- |
+| **Master Recovery Key**<br>*(BIP39 Mnemonic)* | A human-readable 24-word phrase (e.g., `apple banana ...`). | **Client**: Browser `localStorage` (`e2e_recovery_{userId}`).<br>**Server**: Bcrypt-hashed representation (`master_key`) for verification. | **Derivation Key**: Not used to encrypt messages directly. Instead, it is the root seed from which the client derives the asymmetric Curve25519 keypair. |
+| **Curve25519 Public Key**<br>*(Asymmetric Key)* | A Base64-encoded representation of the Curve25519 public key. | **Client**: Browser memory / `sessionStorage`.<br>**Server**: Saved publicly in MongoDB on the User document (`public_key`). | **The Lock**: Shared publicly. When a sender transmits a message, their browser uses the recipient's **Public Key** to wrap and lock the message-specific symmetric key. |
+| **Curve25519 Private Key**<br>*(Asymmetric Key)* | A Base64-encoded representation of the Curve25519 private key. | **Client**: Browser `sessionStorage` (`e2e_private_{userId}`).<br>**Server**: **Never sent to the server.** | **The Unlocking Key**: Kept private. When you receive a message, your browser uses your **Private Key** to open the wrapped envelope and retrieve the symmetric key. |
+| **Message Symmetric Key**<br>*(`msgKey` / Ephemeral)* | A randomly generated 256-bit symmetric key. | **Client**: Exists only in transient memory during message processing. **Never stored.** | **Content Lock & Unlock**: Used to symmetrically encrypt the plaintext message body on sending, and decrypt the ciphertext back to plaintext on receiving. |
+
 ---
 
-## 3. Encryption Flow (Sending)
+## 3. The Envelope Encryption Lifecycle
 
-When the user clicks send, the `encryptAndSend` function in the Blade file orchestrates the encryption before sending data to the server.
+To support multi-recipient chats (groups) and preserve maximum privacy, SanCo uses **Envelope Encryption** (Hybrid Cryptography). 
 
-**Code: `resources/views/livewire/messenger.blade.php`**
-```javascript
-async encryptAndSend() {
-    const body = this.localBody;
-    const userId = @js((string) auth()->id());
-    let keys = @js($selected->participant_public_keys ?? []);
-    let privateKey = sessionStorage.getItem('e2e_private_' + userId);
-
-    // ... key recovery logic ...
-
-    if (canEncrypt) {
-        // 1. Encrypt body and wrap keys for recipients
-        const result = await window.EncryptionService.encryptMessage(body, keys, privateKey);
-        
-        // 2. Send only encrypted data to Livewire/Server
-        await $wire.messageUser(result.encBody, result.nonce, result.keys);
-        this.localBody = '';
-    }
-}
+```
+                                  MESSAGE ENVELOPE CREATION
+                                  
+   Plaintext Message ──────> [ Symmetric Encrypter ] ──────────> Encrypted Ciphertext
+                                     ▲
+                                     │ (msgKey)
+                              [ Random Generator ]
+                                     │
+                                     ├─────────────────────────┐
+                                     │ (msgKey)                │ (msgKey)
+                                     ▼                         ▼
+   Bob's Public Key  ───> [ Curve25519 Seal ]        Alice's Public Key ───> [ Curve25519 Seal ]
+                                 │                                               │
+                                 ▼                                               ▼
+                         Bob's Wrapped Key                               Alice's Wrapped Key
 ```
 
-**Code: `resources/js/encrypt.js` (The Engine)**
+### 3.1 Encryption & Key Wrapping (`resources/js/encrypt.js`)
+When Alice sends a message in a conversation containing herself and Bob:
+
+1. A random 256-bit symmetric key (`msgKey`) and a 192-bit initialization vector (`nonce`) are generated.
+2. The message body is encrypted symmetrically using the `msgKey`.
+3. The `msgKey` is encrypted (sealed) individually using Bob's public key and Alice's public key.
+4. Only the ciphertext, nonce, and the wrapped keys map are sent to the server.
+
 ```javascript
 async encryptMessage(body, recipientPublicKeys, senderPrivateKeyBase64) {
     const msgKey = this.sodium.randombytes_buf(this.sodium.crypto_secretbox_KEYBYTES);
     const nonce = this.sodium.randombytes_buf(this.sodium.crypto_secretbox_NONCEBYTES);
     
-    // Encrypt the body with the symmetric msgKey
+    // Encrypt message symmetrically
     const encBody = this.sodium.crypto_secretbox_easy(body, nonce, msgKey);
     
-    // Wrap (Encrypt) the msgKey for each recipient using their Public Key
+    // Seal symmetric key for each participant (using Anonymous Sealed Box)
     const encryptedKeys = {};
     for (const [userId, publicKeyBase64] of Object.entries(recipientPublicKeys)) {
         const publicKey = this.sodium.from_base64(publicKeyBase64);
@@ -97,119 +156,126 @@ async encryptMessage(body, recipientPublicKeys, senderPrivateKeyBase64) {
         encryptedKeys[userId] = this.sodium.to_base64(encKey);
     }
 
-    return { encBody: this.sodium.to_base64(encBody), nonce: this.sodium.to_base64(nonce), keys: encryptedKeys };
+    return { 
+        encBody: this.sodium.to_base64(encBody), 
+        nonce: this.sodium.to_base64(nonce), 
+        keys: encryptedKeys 
+    };
 }
 ```
 
----
+### 3.2 Decryption & Key Unwrapping (`resources/js/encrypt.js`)
+When Bob receives the message package from the server:
 
-## 4. Decryption Flow (Receiving)
+1. Bob extracts his wrapped key envelope using his user ID: `metadata.enc_keys[Bob's ID]`.
+2. Bob opens the sealed box using his Curve25519 private key to recover the symmetric `msgKey`.
+3. Bob decrypts the ciphertext using the recovered `msgKey` and the message's `nonce`.
 
-Messages are decrypted locally in the browser. The server only sees the `encBody` and `metadata`.
-
-**Code: `resources/js/encrypt.js`**
 ```javascript
-async decryptMessageForMe(encBody, metadata, userId) {
-    const privateKey = sessionStorage.getItem('e2e_private_' + userId);
-    const encKeyForMe = metadata.enc_keys?.[userId];
-    const nonce = metadata.nonce;
-
-    // 1. Use Private Key to decrypt the symmetric 'msgKey'
-    const msgKey = this.sodium.crypto_box_seal_open(encKeyForMe, myPublicKey, myPrivateKey);
-    
-    // 2. Use 'msgKey' and 'nonce' to decrypt the actual message body
-    const decryptedBody = this.sodium.crypto_secretbox_open_easy(encBody, nonce, msgKey);
-    
-    return this.sodium.to_string(decryptedBody);
+async decryptMessage(encBodyBase64, nonceBase64, encKeyForMeBase64, myPublicKeyBase64, myPrivateKeyBase64) {
+    await this.init();
+    try {
+        const myPublicKey = this.sodium.from_base64(myPublicKeyBase64);
+        const myPrivateKey = this.sodium.from_base64(myPrivateKeyBase64);
+        const encKeyForMe = this.sodium.from_base64(encKeyForMeBase64);
+        
+        // Unseal the message-specific symmetric key
+        const msgKey = this.sodium.crypto_box_seal_open(encKeyForMe, myPublicKey, myPrivateKey);
+        
+        // Decrypt the ciphertext with the recovered symmetric key
+        const encBody = this.sodium.from_base64(encBodyBase64);
+        const nonce = this.sodium.from_base64(nonceBase64);
+        const decryptedBody = this.sodium.crypto_secretbox_open_easy(encBody, nonce, msgKey);
+        
+        return this.sodium.to_string(decryptedBody);
+    } catch (e) {
+        console.error("Decryption failed", e);
+        return "[Decryption Failed]";
+    }
 }
 ```
 
 ---
 
-## 5. Security Highlights
-- **Zero-Knowledge**: The server stores only base64 encrypted blobs. It cannot derive the symmetric key because it lacks the users' private keys.
-- **Forced Re-Auth**: Login routes use `prompt=select_account` to ensure users can switch accounts without auto-logging into the previous session.
-- **Storage Isolation**: Keys are explicitly tied to `userId` in storage to prevent accidental decryption if storage isn't cleared.
-- **Automatic Scrubbing**: Any logout action triggers a browser event that purges all E2E keys from `localStorage` and `sessionStorage`.
+## 4. Security Architecture Highlights
+
+- **Zero-Knowledge Architecture**: The server acts as a blind mailbox. Plaintext message bodies and private keys are never transmitted to the network. The server only sees base64-encoded ciphertexts and sealed envelopes.
+- **Anonymous Key Sealing (`crypto_box_seal`)**: Curve25519 sealed boxes do not contain public keys or signatures that expose the sender's identity to third parties. They are anonymous, ensuring that eavesdroppers cannot determine which key was used to wrap the envelope.
+- **Session Separation via Multi-Tab Storage**: Derived keys reside in `sessionStorage`. If a user opens a new tab, the keys are securely derived again from the mnemonic, but if they log out, the session storage is instantly destroyed.
+- **Key Rotation Support**: Users can generate a new BIP39 recovery phrase from the settings overlay. This immediately derives a new Curve25519 keypair, uploads the new public key, and updates the local storage, rotating the user's active key. (Note: historical messages will remain encrypted with the previous keys and cannot be decrypted without importing the old recovery phrase).
+- **Session Hijack Prevention**: The `DetectConcurrentLogins` middleware continuously checks the active session ID against the database. If a new session is logged in from a different IP/Location/browser, the old session is automatically invalidated, and its E2E keys are scrubbed immediately.
 
 ---
 
-## 6. Key Synchronization & Message Exchange
+## 5. Key Synchronization & Multi-Platform Login Workflow
 
-To enable E2E communication, users must exchange public keys securely. The workflow below describes how keys are synchronized and shared:
+Because SanCo is a zero-knowledge E2EE application, the server never stores or transmits E2E private keys or unhashed recovery mnemonics. When a user transitions between browsers, platforms, or devices, keys must be re-established. 
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Alice as Alice (Sender)
-    participant DB as Server/Database
-    actor Bob as Bob (Receiver)
+The application utilizes a **single-session enforcement model** combined with **on-demand key synchronization** to handle cross-platform transitions securely and prevent key synchronization conflicts.
 
-    rect rgb(200, 220, 255)
-    Note over Alice,Bob: Phase 1: Initial Key Registration
-    
-    Bob->>DB: 1. Register: POST /api/save-public-key
-    Note right of Bob: Derives keypair from mnemonic<br/>(24-word recovery phrase)
-    DB->>DB: 2. Store Bob's public key<br/>in 'users' collection
-    DB-->>Bob: ✓ Public key saved
-    end
+### 5.1 The Multi-Platform Login Lifecycle
 
-    rect rgb(220, 255, 220)
-    Note over Alice,Bob: Phase 2: Prepare to Send Message
-    
-    Alice->>DB: 3. Fetch: GET /api/participants?conversation_id
-    DB-->>Alice: 4. Return all participant public keys<br/>(including Bob's public key)
-    Alice->>Alice: 5. Generate random message key (msgKey)<br/>Encrypt message body with msgKey
-    end
-
-    rect rgb(255, 235, 205)
-    Note over Alice,Bob: Phase 3: Wrap Keys & Send
-    
-    Alice->>Alice: 6. For each recipient (Bob):<br/>Seal msgKey with their public key<br/>enc_keys[Bob_ID] = seal(msgKey, Bob_pubKey)
-    
-    Alice->>DB: 7. Send encrypted package:<br/>{ encBody, nonce, keys_map }
-    DB->>DB: 8. Store encrypted message record
-    Note left of DB: Server sees only ciphertext<br/>Cannot access plain message or msgKey
-    DB-->>Alice: ✓ Message delivered
-    end
-
-    rect rgb(255, 220, 230)
-    Note over Alice,Bob: Phase 4: Receive & Decrypt
-    
-    DB->>Bob: 9. Deliver encrypted payload<br/>{ encBody, nonce, keys_map }
-    
-    Bob->>Bob: 10. Extract Bob's encrypted key:<br/>encKeyForMe = keys_map[Bob_ID]
-    
-    Bob->>Bob: 11. Unseal with private key:<br/>msgKey = unseal(encKeyForMe,<br/>Bob_privKey)
-    
-    Bob->>Bob: 12. Decrypt message body:<br/>plaintext = decrypt(encBody,<br/>msgKey, nonce)
-    
-    Note right of Bob: Only Bob can decrypt<br/>using his private key
-    end
+```
+[ User logs into Browser B ]
+            │
+            ▼
+┌────────────────────────────────────────────────────────┐
+│ 1. Concurrent Session Invalidation (Server-side)      │
+│    - DetectConcurrentLogins middleware triggers.       │
+│    - Logs out Browser A instantly.                    │
+│    - Triggers 'logout' event on Browser A to scrub    │
+│      its localStorage and sessionStorage E2E keys.      │
+└────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌────────────────────────────────────────────────────────┐
+│ 2. E2E State Initialization on Browser B               │
+│    - Browser B has empty localStorage and E2E keys.    │
+│    - UI displays "Standard (Waiting for keys)".        │
+└────────────────────────────────────────────────────────┘
+            │
+            ├────────────────────────────────────────────┐
+            ▼ (Option A: Restore Existing Key)          ▼ (Option B: Rotate & Generate New Key)
+┌───────────────────────────────────────────────────┐    ┌───────────────────────────────────────────────────┐
+│ 3a. User inputs/sets existing 24-word recovery    │    │ 3b. User clicks "Generate New Key" in settings    │
+│     phrase in localStorage.                       │    │     - Server generates new BIP39 phrase.          │
+│ 4a. User clicks "Sync Now" in Settings.           │    │     - Bcrypt-hashes master key on DB.             │
+│ 5a. Browser derives Curve25519 keypair and caches │    │ 4b. Browser saves new phrase in localStorage.     │
+│     private key in sessionStorage.                │    │ 5b. Browser derives new keypair and caches        │
+│ 6a. Browser checks/saves public key consistency   │    │     private key in sessionStorage.                │
+│     with the server.                              │    │ 6b. Browser saves public key to MongoDB.          │
+└───────────────────────────────────────────────────┘    └───────────────────────────────────────────────────┘
+            │                                                                │
+            └────────────────────────────────┬───────────────────────────────┘
+                                             │
+                                             ▼
+┌────────────────────────────────────────────────────────┐
+│ 7. Peer Sync                                           │
+│    - Other users' active client key caches detect the  │
+│      new public key.                                   │
+│    - Future messages sent to the user are wrapped      │
+│      using this new public key.                        │
+└────────────────────────────────────────────────────────┘
 ```
 
-### 6.1 Public Key Registration (Alice/Bob Setup)
-On initial login or recovery, the client derives its key pair from the mnemonic. If the server does not yet store the public key for the user, the client automatically uploads it via:
-1. The Livewire component's `savePublicKey` action in [messenger.blade.php](file:///home/ninonakano/Desktop/SanCo/resources/views/livewire/messenger.blade.php).
-2. The `/api/save-public-key` fallback endpoint in [routes/web.php](file:///home/ninonakano/Desktop/SanCo/routes/web.php).
+### 5.2 Key Steps in the Synchronisation Process
 
-Once uploaded, the public key is persisted on the user's document in the Database (`users` collection).
+1. **Enforcing One Session (Preventing Conflicts)**:
+   When the user logs into a new browser (Browser B), the server updates `current_session_id` on the user's document in MongoDB. The next time the user's old browser (Browser A) makes a request, the `DetectConcurrentLogins` middleware terminates the session, logs out the user, and redirects to the landing page. Crucially, Browser A's JS runtime intercepts this logout and cleanses all localStorage and sessionStorage keys. This prevents two active browsers from encrypting/decrypting messages under competing sessions or inconsistent keys.
 
-### 6.2 Key Retreival & Symmetric Envelope Wrapping (Sending)
-When Alice writes a message to Bob in a shared conversation:
-1. The client retrieves the public keys of all conversation participants (`participant_public_keys`).
-2. The client generates a random, message-specific symmetric key (`msgKey`) using `libsodium`.
-3. The message body is encrypted symmetrically with `msgKey`.
-4. The `msgKey` is encrypted (sealed) individually for each participant using their respective public keys:
-   $$\text{enc\_keys}[\text{userId}] = \text{sodium.crypto\_box\_seal}(\text{msgKey}, \text{publicKey}_{\text{userId}})$$
-5. The payload containing the encrypted body (`encBody`), the initialization vector (`nonce`), and the map of encrypted symmetric keys (`keys`) is dispatched to the server.
+2. **Restoring the Key (Browser B Setup)**:
+   Since Browser B has no E2E keys initially, the user can either:
+   - **Restore Existing Key**: Paste their existing 24-word recovery mnemonic into localStorage under `e2e_recovery_{userId}` (via the developer tools console or setup) and click **Sync Now** in Settings. The client runs `deriveKeyPair(mnemonic)` which derives the identical Curve25519 public/private keys. The private key is saved to `sessionStorage` and E2EE is fully restored, preserving readability for historical messages.
+   - **Generate New Key (Key Rotation)**: Click **Generate New Key** in the settings panel. This prompts the server to generate a new BIP39 recovery mnemonic, hashes it, and stores the bcrypt hash in MongoDB. The client derives the new Curve25519 keypair, writes the mnemonic to `localStorage`, caches the private key in `sessionStorage`, and uploads the new public key.
 
-### 6.3 Localized Envelope Unwrapping (Receiving)
-When Bob receives the message from the server:
-1. The client checks `sessionStorage` for the user's private key.
-2. The client extracts Bob's specific encrypted key envelope from the message metadata:
-   $$\text{encKeyForMe} = \text{metadata.enc\_keys}[\text{Bob's userId}]$$
-3. Bob's private key opens (unseals) the envelope to retrieve the raw symmetric `msgKey`:
-   $$\text{msgKey} = \text{sodium.crypto\_box\_seal\_open}(\text{encKeyForMe}, \text{Bob's publicKey}, \text{Bob's privateKey})$$
-4. The client uses the recovered `msgKey` and `nonce` to decrypt the raw message body locally. Plaintext is never exposed to the server.
+   > [!WARNING]
+   > **Historical Message Readability Constraint:**
+   > If the user chooses to **Generate a New Key** (Option B) on a new device/browser instead of restoring their existing mnemonic:
+   > 1. A new asymmetric keypair is generated. The new private key is mathematically unrelated to the previous one.
+   > 2. Historical messages that were sealed using the *old* public key **cannot** be decrypted using the *new* private key.
+   > 3. Consequently, the user will lose the ability to read historical messages on that device.
+   > 4. To maintain access to old messages, the user **must** import their original 24-word Master Recovery Key, which derives the exact same private key.
+
+3. **Peer Key Cache Invalidation**:
+   Peers sending messages check `sessionStorage` first for recipient public keys. When a user syncs a new public key to the server, the peer clients detect a mismatch or update on their next cache-miss check. They re-fetch the updated public key via the Livewire component `$wire.getParticipantKeys()`, update their local caches, and wrap subsequent message envelopes with the user's updated public key.
 
