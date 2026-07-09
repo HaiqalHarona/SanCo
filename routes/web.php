@@ -24,3 +24,18 @@ Route::middleware('auth')->group(function () {
         return response()->json(['success' => true]);
     })->name('api.save-public-key');
 });
+
+if (app()->environment('local')) {
+    Route::get('/auth/dev-login/{id}', function ($id) {
+        $user = \App\Models\User::findOrFail($id);
+        auth()->login($user);
+        session()->regenerate();
+        $user->update([
+            'current_session_id' => session()->getId(),
+            'last_login_ip' => request()->ip(),
+            'last_login_browser' => request()->header('User-Agent'),
+        ]);
+        return redirect()->route('messenger')->with('success', 'Logged in as Dev User: ' . $user->name);
+    })->name('auth.dev-login');
+}
+

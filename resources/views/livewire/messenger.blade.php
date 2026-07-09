@@ -403,12 +403,7 @@ new class extends Component {
 
         <div class="space-y-4 flex flex-col items-center">
             <button @click="$store.theme.toggle()" class="p-3 text-[#71717a] transition group relative">
-                <svg x-show="$store.theme.current === 'dark'" class="w-6 h-6" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 5a7 7 0 100 14 7 7 0 000-14z">
-                    </path>
-                </svg>
+                <span x-show="$store.theme.current === 'dark'" class="material-symbols-outlined w-6 h-6 flex items-center justify-center" style="font-size: 24px;">sunny</span>
                 <svg x-show="$store.theme.current === 'light'" class="w-6 h-6" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

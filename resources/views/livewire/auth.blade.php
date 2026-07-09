@@ -114,11 +114,6 @@ layout('layouts.auth');
             {{-- ---- FORM AREA ---- --}}
             <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
 
-                {{-- Logo Placeholder --}}
-                <div class="flex justify-center -mb-6 -mt-10">
-                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-72 w-auto object-contain -my-10" alt="SanCo Logo">
-                </div>
-
                 {{-- Heading --}}
                 <div class="mb-10">
                     <h1 class="text-white text-2xl font-bold tracking-tight mb-2">Get Started</h1>
@@ -155,6 +150,24 @@ layout('layouts.auth');
                     </a>
                 </div>
 
+                @if (app()->environment('local'))
+                    <div class="mt-8 p-4 bg-white/5 rounded-2xl border border-white/10 text-left">
+                        <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-2 text-white/60">Developer Quick Login</h3>
+                        <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                            @php $devUsers = \App\Models\User::limit(6)->get(); @endphp
+                            @if ($devUsers->isEmpty())
+                                <p class="text-white/40 text-xs italic">No users seeded yet. Run php artisan db:seed</p>
+                            @else
+                                @foreach ($devUsers as $devUser)
+                                    <a href="{{ route('auth.dev-login', $devUser->id) }}" class="block w-full text-left px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-white/80 text-xs transition-all truncate hover:translate-x-1 duration-200">
+                                        <span class="font-bold text-white">{{ $devUser->name }}</span>
+                                        <span class="block text-[10px] text-white/40">{{ $devUser->email ?? 'No email' }}</span>
+                                    </a>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
