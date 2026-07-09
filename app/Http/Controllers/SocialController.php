@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\UserService;
 use FurqanSiddiqui\BIP39\BIP39;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -12,6 +13,7 @@ use Laravel\Socialite\Facades\Socialite;
 
 class SocialController extends Controller
 {
+    public function __construct(private UserService $userService) {}
 
     public function redirectProvider($provider)
     {
@@ -98,11 +100,13 @@ class SocialController extends Controller
                 Auth::login($appUser);
                 session()->regenerate();
 
-                // Store the NEW session ID in the database to track concurrent logins
+                // Store session ID in Redis (replaces MongoDB current_session_id write)
+                $this->userService->setSession((string) $appUser->_id, session()->getId());
+
+                // Store login metadata in MongoDB (infrequent, non-hot-path)
                 $appUser->update([
-                    'current_session_id' => session()->getId(),
-                    'last_login_ip' => $ip,
-                    'last_login_browser' => $browser,
+                    'last_login_ip'       => $ip,
+                    'last_login_browser'  => $browser,
                     'last_login_location' => $location,
                 ]);
 
@@ -139,11 +143,13 @@ class SocialController extends Controller
 
     public function logout(Request $request)
     {
-        // Get the current user ID before logout to clear specific session keys if needed
-        $userId = Auth::id();
-        
+        $userId = (string) Auth::id();
+
+        // Clear Redis session key so concurrent login detection is reset
+        $this->userService->forgetSession($userId);
+
         Auth::logout();
-        
+
         // Invalidate the session and regenerate the token to prevent session fixation
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -152,7 +158,7 @@ class SocialController extends Controller
         $request->session()->forget([
             'new_master_key',
             'e2e_private_' . $userId,
-            'e2e_public_' . $userId
+            'e2e_public_' . $userId,
         ]);
 
         return redirect()->route('auth')->with('success', 'Logged out successfully');

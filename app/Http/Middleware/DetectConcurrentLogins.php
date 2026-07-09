@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\UserService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -9,6 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class DetectConcurrentLogins
 {
+    public function __construct(private UserService $userService) {}
+
     /**
      * Handle an incoming request.
      *
@@ -18,25 +21,25 @@ class DetectConcurrentLogins
     {
         if (Auth::check()) {
             $user = Auth::user();
+            $userId = (string) $user->_id;
             $currentSessionId = $request->session()->getId();
 
-            // If the session ID in the browser doesn't match the one in the DB, 
-            // it means a newer login has happened elsewhere.
-            if ($user->current_session_id && $user->current_session_id !== $currentSessionId) {
+            // Compare against session ID stored in Redis (set at login time)
+            // instead of fetching the user row from MongoDB on every request.
+            $storedSessionId = $this->userService->getSession($userId);
+
+            if ($storedSessionId && $storedSessionId !== $currentSessionId) {
                 $location = $user->last_login_location ?? 'Unknown';
-                $browser = $user->last_login_browser ?? 'Unknown Browser';
+                $browser  = $user->last_login_browser  ?? 'Unknown Browser';
+                $avatar   = $user->avatar;
 
-                $avatar = $user->avatar;
-
-                // Log the old session out immediately
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
-                // Redirect with metadata about the new login to notify the user
                 return redirect()->route('auth')->with([
-                    'error' => "Another login detected. You have been logged out. New login from: {$location} using {$browser}.",
-                    'avatar' => $avatar
+                    'error'  => "Another login detected. You have been logged out. New login from: {$location} using {$browser}.",
+                    'avatar' => $avatar,
                 ]);
             }
         }

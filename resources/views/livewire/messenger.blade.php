@@ -5,6 +5,10 @@ use App\Models\Conversation;
 use App\Models\Friendship;
 use App\Models\User;
 use App\Models\Message;
+use App\Services\UserService;
+use App\Services\FriendshipService;
+use App\Services\ConversationService;
+use App\Services\MessageService;
 use Livewire\Attributes\Computed;
 use App\Events\MessageSent;
 use Illuminate\Support\Facades\Storage;
@@ -33,19 +37,19 @@ new class extends Component {
     #[Computed]
     public function incomingRequest()
     {
-        return Friendship::getPendingRequests(auth()->id());
+        return app(FriendshipService::class)->getPendingRequests(auth()->id());
     }
 
     #[Computed]
     public function sentRequest()
     {
-        return Friendship::getSentRequests(auth()->id());
+        return app(FriendshipService::class)->getSentRequests(auth()->id());
     }
 
     public function acceptRequest(string $senderId)
     {
         try {
-            Friendship::acceptRequest(auth()->id(), $senderId);
+            app(FriendshipService::class)->acceptRequest(auth()->id(), $senderId);
             session()->flash('success', 'Friend request accepted');
             dispatch('request-accepted');
             $this->reloadContacts($senderId);
@@ -57,7 +61,7 @@ new class extends Component {
     public function rejectRequest(string $senderId)
     {
         try {
-            Friendship::rejectRequest(auth()->id(), $senderId);
+            app(FriendshipService::class)->rejectRequest(auth()->id(), $senderId);
         } catch (\Exception $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -90,50 +94,20 @@ new class extends Component {
             'profileName' => 'required|string|max:255',
         ]);
 
-        $user = User::find(auth()->id());
-        $user->name = $this->profileName;
+        $userService = app(UserService::class);
+        $userService->updateProfile(auth()->id(), $this->profileName);
 
         if ($this->profileAvatar) {
-            // Check if it's a base64 image
-            if (preg_match('/^data:image\/(\w+);base64,/', $this->profileAvatar, $type)) {
-                $data = substr($this->profileAvatar, strpos($this->profileAvatar, ',') + 1);
-                $type = strtolower($type[1]); // jpg, png, gif
-
-                if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-                    throw new \Exception('invalid image type');
-                }
-                $data = base64_decode($data);
-
-                if ($data === false) {
-                    throw new \Exception('base64_decode failed');
-                }
-
-                // Ensure storage directory exists
-                if (!Storage::disk('public')->exists('avatars')) {
-                    Storage::disk('public')->makeDirectory('avatars');
-                }
-
-                $filename = Str::random(40) . '.' . $type;
-                Storage::disk('public')->put('avatars/' . $filename, $data);
-
-                $user->avatar = asset('storage/avatars/' . $filename);
-            }
+            $userService->updateAvatar(auth()->id(), $this->profileAvatar);
+            $this->profileAvatar = null;
         }
 
-        $user->save();
-        $this->profileAvatar = null; // Clear out base64 string to free memory
         $this->dispatch('profile-updated');
     }
 
     public function generateNewKey()
     {
-        $masterKey = implode(' ', BIP39::Generate(24)->words);
-
-        $user = User::find(auth()->id());
-        $user->master_key = bcrypt($masterKey);
-        $user->save();
-
-        return $masterKey;
+        return app(UserService::class)->rotateKey(auth()->id());
     }
 
     /**
@@ -143,7 +117,7 @@ new class extends Component {
     public function selectConversation($id, $userId = null)
     {
         if (!$id && $userId) {
-            $convo = Conversation::findOrCreateDirect(auth()->id(), $userId);
+            $convo = app(ConversationService::class)->findOrCreateDirect(auth()->id(), $userId);
             $this->selectedConversationId = (string) $convo->_id;
         } else {
             $this->selectedConversationId = (string) $id;
@@ -159,18 +133,15 @@ new class extends Component {
             return null;
         }
 
-        $convo = Conversation::find($this->selectedConversationId);
+        $convService = app(ConversationService::class);
+        $convo = $convService->getConversation($this->selectedConversationId);
 
-        $messages = Message::getMessages($convo->_id, $this->loadLimit);
+        $messages = app(MessageService::class)->getMessages($this->selectedConversationId, 1, $this->loadLimit);
 
-        $convo->setRelation('messages', $messages->getCollection()->reverse());
+        $convo->setRelation('messages', collect($messages->items())->reverse());
 
-        // Load participant public keys with string IDs to match JS auth()->id()
-        // We use fresh User queries to ensure we get the latest public_key from the database
-        $participants = User::whereIn('_id', $convo->participant_ids)->get(['_id', 'public_key']);
-        $convo->participant_public_keys = $participants->mapWithKeys(function ($user) {
-            return [(string) $user->_id => $user->public_key];
-        })->toArray();
+        // Load participant public keys from cache
+        $convo->participant_public_keys = $convService->getParticipantKeys($this->selectedConversationId);
 
         return $convo;
     }
@@ -178,7 +149,7 @@ new class extends Component {
     #[Computed]
     public function preloadChatList()
     {
-        return Conversation::getInboxFor(auth()->user());
+        return app(ConversationService::class)->getInbox(auth()->user());
     }
 
     /**
@@ -187,23 +158,7 @@ new class extends Component {
     #[Computed]
     public function contacts()
     {
-        $auth_id = auth()->id();
-
-        // Get Contacts either or in user_id or friend_id column
-        $friendships = Friendship::where('status', 'accepted')
-            ->where(function ($query) use ($auth_id) {
-                $query->where('user_id', $auth_id)->orWhere('friend_id', $auth_id);
-            })
-            ->get();
-
-        // Map friendships and get id of the other user in the conversation (friend_id)
-        $friendsIds = $friendships
-            ->map(function ($f) use ($auth_id) {
-                return (string) $f->user_id === (string) $auth_id ? (string) $f->friend_id : (string) $f->user_id;
-            })
-            ->unique();
-
-        return User::whereIn('_id', $friendsIds)->get();
+        return app(FriendshipService::class)->getFriends(auth()->id());
     }
     /**
      * @var string $searchUserTag
@@ -237,8 +192,8 @@ new class extends Component {
         }
 
         try {
-            Friendship::sendRequest(auth()->id(), $this->searchResult->_id);
-            broadcast(new IncomingRequest($this->searchResult->_id, auth()->user()->name))->toOthers(); // Send Event to the reciever
+            app(FriendshipService::class)->sendRequest(auth()->id(), $this->searchResult->_id);
+            broadcast(new IncomingRequest($this->searchResult->_id, auth()->user()->name))->toOthers();
             session()->flash('success', 'Friend request sent to ' . $this->searchResult->name);
             $this->dispatch('friend-request-sent');
             $this->reset(['searchUserTag', 'searchResult']);
@@ -265,16 +220,16 @@ new class extends Component {
             return;
         }
 
-        $message = Message::sendMessage([
+        $message = app(MessageService::class)->send([
             'conversation_id' => $this->selectedConversationId,
-            'sender_id' => auth()->id(),
-            'body' => $body,
-            'type' => 'text',
-            'metadata' => [
-                'nonce' => $nonce,
-                'enc_keys' => $encryptedKeys,
-                'is_encrypted' => !!$encryptedKeys
-            ]
+            'sender_id'       => auth()->id(),
+            'body'            => $body,
+            'type'            => 'text',
+            'metadata'        => [
+                'nonce'        => $nonce,
+                'enc_keys'     => $encryptedKeys,
+                'is_encrypted' => !!$encryptedKeys,
+            ],
         ]);
 
         // Clear Input Box
@@ -298,12 +253,16 @@ new class extends Component {
 
     public function savePublicKey(string $publicKey)
     {
-        $user = User::find(auth()->id());
-        $user->update(['public_key' => $publicKey]);
-        
+        app(UserService::class)->syncPublicKey(auth()->id(), $publicKey);
+
+        // Bust participant key cache for the current conversation
+        if ($this->selectedConversationId) {
+            app(ConversationService::class)->bustParticipantKeys($this->selectedConversationId);
+        }
+
         // Force re-evaluation of computed properties
         unset($this->selectedConversation);
-        
+
         // Refresh component state
         $this->dispatch('$refresh');
     }
@@ -318,16 +277,7 @@ new class extends Component {
             return [];
         }
 
-        $convo = Conversation::find($this->selectedConversationId);
-        if (!$convo) {
-            return [];
-        }
-
-        $participants = User::whereIn('_id', $convo->participant_ids)->get(['_id', 'public_key']);
-
-        return $participants->mapWithKeys(function ($user) {
-            return [(string) $user->_id => $user->public_key];
-        })->toArray();
+        return app(ConversationService::class)->getParticipantKeys($this->selectedConversationId);
     }
 };
 

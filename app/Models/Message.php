@@ -12,6 +12,22 @@ class Message extends Model
     protected $connection = 'mongodb';
     protected $collection = 'messages';
 
+    protected static function booted()
+    {
+        static::saving(function (Message $message) {
+            if ($message->type !== 'system') {
+                $metadata = $message->metadata ?? [];
+                $isEncrypted = $metadata['is_encrypted'] ?? false;
+                $nonce = $metadata['nonce'] ?? null;
+                $encKeys = $metadata['enc_keys'] ?? null;
+
+                if (!$isEncrypted || empty($nonce) || empty($encKeys)) {
+                    throw new \InvalidArgumentException('Message body must be end-to-end encrypted (E2EE). Plaintext is rejected.');
+                }
+            }
+        });
+    }
+
     protected $fillable = [
         'conversation_id',
         'sender_id',
