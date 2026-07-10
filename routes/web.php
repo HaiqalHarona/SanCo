@@ -6,6 +6,9 @@ use App\Http\Controllers\SocialController;
 
 Volt::route('/', 'auth')->name('auth');
 
+// Generic "page not found" — all 4xx errors are redirected here
+Route::get('/not-found', fn () => view('errors.4xx'))->name('error.not-found');
+
 //Socialite Routes
 Route::get('/auth/{provider}/redirect', [SocialController::class, 'redirectProvider'])->where('provider', 'google|github')->name('social.redirect');
 Route::get('/auth/{provider}/callback', [SocialController::class, 'callbackRequest'])->where('provider', 'google|github')->name('social.callback');

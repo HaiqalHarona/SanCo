@@ -110,8 +110,19 @@ Below are the key files and folders in the codebase:
 │               └── settings-overlay.blade.php          # User profile settings & key regenerator
 │
 ├── ENCRYPTION.md                              # Deep-dive documentation on E2EE mechanisms
-└── relationship_diagram.md                     # Entity-relationship and schema definitions
+├── relationship_diagram.md                     # Entity-relationship and schema definitions
+└── thunder_client_api_test.md                  # REST API reference and testing suite for Thunder Client
 ```
+
+---
+
+## Documentation & Reference Guides
+
+To help understand the database architecture, security designs, and backend APIs:
+
+*   [End-to-End Encryption Specification (ENCRYPTION.md)](file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md) — Architectural overview of sodium-based browser cryptography and key distribution.
+*   [Database Entity Relationship & Schema Details (relationship_diagram.md)](file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md) — MongoDB collection designs, relationships, and caching strategies.
+*   [REST API & Thunder Client Reference Suite (thunder_client_api_test.md)](file:///C:/Users/johan/Desktop/Laravel/SanCo/thunder_client_api_test.md) — HTTP API endpoints overview and testing details.
 
 ---
 
