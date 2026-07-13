@@ -28,7 +28,7 @@ Route::middleware('auth')->group(function () {
     })->name('api.save-public-key');
 });
 
-if (app()->environment('local')) {
+if (config('app.allow_dev_login')) {
     Route::get('/auth/dev-login/{id}', function ($id) {
         $user = \App\Models\User::findOrFail($id);
         auth()->login($user);
@@ -41,4 +41,6 @@ if (app()->environment('local')) {
         return redirect()->route('messenger')->with('success', 'Logged in as Dev User: ' . $user->name);
     })->name('auth.dev-login');
 }
+
+
 

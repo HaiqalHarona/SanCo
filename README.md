@@ -4,6 +4,35 @@ SanCo is a modern, high-fidelity real-time messaging application designed with p
 
 ---
 
+## Project Documentation Directory
+
+To navigate the technical details of the SanCo ecosystem, refer to the following specialized documentation guides:
+
+### <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md">End-to-End Encryption Specification</a>
+Detailed specification of the zero-knowledge security model and browser cryptography:
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md#1-cryptographic-primitives--technology-stack">Cryptographic Primitives & Tech Stack</a> (libsodium, BIP39, Curve25519, XSalsa20-Poly1305)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md#2-key-management--storage-architecture">Key Management & Storage Architecture</a> (Derivation logic, sessionStorage/localStorage lifetimes, scrubbing)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md#3-the-envelope-encryption-lifecycle">The Envelope Encryption Lifecycle</a> (Encryption/decryption, key wrapping/unwrapping)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md#4-security-architecture-highlights">Security Architecture Highlights</a> (Zero-knowledge, session separation, rotation, hijack prevention)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md#5-key-synchronization--multi-platform-login-workflow">Key Synchronization & Multi-Platform Login</a> (Single-session enforcement, sync lifecycle, constraint warnings)
+
+### <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md">Database Schema & Architecture</a>
+Comprehensive design of the database collections, model relationships, and API blueprints:
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md#entity-relationship-diagram">Entity Relationship Diagram</a> (Mermaid visualization of User, Conversation, Message, Friendship collections)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md#model-relationships--functions">Model Relationships & Functions</a> (API/Helpers for User, Conversation, Message, Attachment, Friendship models)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md#database-architecture-overview">Database Architecture & MongoDB Patterns</a> (Embedded arrays, atomic operations, symmetric/reciprocal friendships)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md#proposed-mobile-api-routes-routesapiphp">Mobile API Routes Proposal</a> (Sanctum authentication, keys, conversations, messaging, friendships endpoints)
+
+### <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md">REST API Reference</a>
+Technical API testing instructions and JSON request/response schema specifications:
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md#global-setup">Global Setup & Headers Presets</a> (Authorization, content type, environment variables)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md#1-authentication--user-profile">Authentication & Profile Endpoints</a> (GET /user, PUT /user/profile, POST /user/keys/sync)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md#2-conversations--channels">Conversations & Channels Endpoints</a> (GET /conversations, POST /conversations, adding/removing participants)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md#3-messages--e2ee-exchange">Messages & E2EE Exchange Endpoints</a> (Sending encrypted payloads, read-receipts, reaction management)
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md#4-friendships--contacts">Friendships & Contacts Endpoints</a> (Requests, accept/reject, unfriend, blocking/unblocking)
+
+---
+
 ## Key Features
 
 - **End-to-End Encryption (E2EE)**: Complete zero-knowledge encryption using `libsodium` (XSalsa20-Poly1305 and Curve25519) and BIP39 mnemonics. The server never sees plaintext messages or keys.
@@ -111,7 +140,7 @@ Below are the key files and folders in the codebase:
 │
 ├── ENCRYPTION.md                              # Deep-dive documentation on E2EE mechanisms
 ├── relationship_diagram.md                     # Entity-relationship and schema definitions
-└── thunder_client_api_test.md                  # REST API reference and testing suite for Thunder Client
+└── api.md                                     # REST API reference and testing suite
 ```
 
 ---
@@ -120,9 +149,9 @@ Below are the key files and folders in the codebase:
 
 To help understand the database architecture, security designs, and backend APIs:
 
-*   [End-to-End Encryption Specification (ENCRYPTION.md)](file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md) — Architectural overview of sodium-based browser cryptography and key distribution.
-*   [Database Entity Relationship & Schema Details (relationship_diagram.md)](file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md) — MongoDB collection designs, relationships, and caching strategies.
-*   [REST API & Thunder Client Reference Suite (thunder_client_api_test.md)](file:///C:/Users/johan/Desktop/Laravel/SanCo/thunder_client_api_test.md) — HTTP API endpoints overview and testing details.
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md">End-to-End Encryption Specification (ENCRYPTION.md)</a> — Architectural overview of sodium-based browser cryptography and key distribution.
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/relationship_diagram.md">Database Entity Relationship & Schema Details (relationship_diagram.md)</a> — MongoDB collection designs, relationships, and caching strategies.
+*   <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/api.md">REST API Reference (api.md)</a> — HTTP API endpoints overview and testing details.
 
 ---
 
@@ -177,4 +206,4 @@ composer run dev
 
 ## Security Auditing
 
-For a deep-dive security breakdown and cryptographic specifications of our end-to-end encryption, check out the [ENCRYPTION.md](file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md) file.
+For a deep-dive security breakdown and cryptographic specifications of our end-to-end encryption, check out the <a href="file:///C:/Users/johan/Desktop/Laravel/SanCo/ENCRYPTION.md">ENCRYPTION.md</a> file.

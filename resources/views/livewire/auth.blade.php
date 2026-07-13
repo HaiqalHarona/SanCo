@@ -150,7 +150,7 @@ layout('layouts.auth');
                     </a>
                 </div>
 
-                @if (app()->environment('local'))
+                @if (config('app.allow_dev_login'))
                     <div class="mt-8 p-4 bg-white/5 rounded-2xl border border-white/10 text-left">
                         <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-2 text-white/60">Developer Quick Login</h3>
                         <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -168,6 +168,7 @@ layout('layouts.auth');
                         </div>
                     </div>
                 @endif
+
             </div>
         </div>
     </div>

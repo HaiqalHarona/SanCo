@@ -42,11 +42,8 @@ class Message extends Model
     ];
 
     protected $casts = [
-        'read_by'     => 'array',
-        'reactions'   => 'array',
         'is_edited'   => 'boolean',
         'edited_at'   => 'datetime',
-        'metadata'    => 'array',
     ];
 
     protected $with = ['sender'];

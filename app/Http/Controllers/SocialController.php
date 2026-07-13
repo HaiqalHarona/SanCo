@@ -15,8 +15,14 @@ class SocialController extends Controller
 {
     public function __construct(private UserService $userService) {}
 
-    public function redirectProvider($provider)
+    public function redirectProvider(Request $request, $provider)
     {
+        if ($request->has('mobile')) {
+            session(['is_mobile' => true]);
+        } else {
+            session()->forget('is_mobile');
+        }
+
         // Force account selection for both Google and GitHub to prevent auto-login
         if ($provider === 'google' || $provider === 'github') {
             return Socialite::driver($provider)
@@ -94,6 +100,24 @@ class SocialController extends Controller
                     }
                 } catch (\Exception $e) {
                     // Fail silently for location fetch to avoid blocking login
+                }
+
+                if (session('is_mobile')) {
+                    session()->forget('is_mobile');
+
+                    // Store login metadata in MongoDB (infrequent, non-hot-path)
+                    $appUser->update([
+                        'last_login_ip'       => $ip,
+                        'last_login_browser'  => $browser,
+                        'last_login_location' => $location,
+                    ]);
+
+                    $token = $appUser->createToken('mobile-auth-token')->plainTextToken;
+                    $redirectUrl = 'sanco://auth/callback?token=' . urlencode($token);
+                    if ($appUser->wasRecentlyCreated) {
+                        $redirectUrl .= '&new_master_key=' . urlencode($masterKey);
+                    }
+                    return redirect($redirectUrl);
                 }
 
                 // Perform login and regenerate session ID to prevent fixation attacks

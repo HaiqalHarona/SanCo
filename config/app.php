@@ -105,6 +105,8 @@ return [
         ),
     ],
 
+    'allow_dev_login' => (bool) env('ALLOW_DEV_LOGIN', false),
+
     /*
     |--------------------------------------------------------------------------
     | Maintenance Mode Driver

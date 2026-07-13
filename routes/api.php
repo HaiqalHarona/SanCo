@@ -6,6 +6,22 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\FriendshipController;
 use Illuminate\Support\Facades\Route;
 
+if (config('app.allow_dev_login')) {
+    Route::post('/dev-login/{id}', function ($id) {
+        $user = \App\Models\User::findOrFail($id);
+        $token = $user->createToken('api-test-token')->plainTextToken;
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'user' => [
+                'id' => (string) $user->_id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ]
+        ]);
+    });
+}
+
 Route::middleware('auth:sanctum')->group(function () {
     
     // AUTH & USER PROFILE

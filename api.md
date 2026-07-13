@@ -20,6 +20,26 @@ You can configure these variables in your Thunder Client environment:
 
 ## 1. Authentication & User Profile
 
+### POST /dev-login/{id} (Local Dev Token Generation)
+Generates a Sanctum Bearer Token for a given user ID to test authenticated API requests locally.
+*   **Method**: `POST`
+*   **URL**: `{{baseUrl}}/dev-login/{{userId}}`
+*   **Response (JSON)**:
+    ```json
+    {
+      "success": true,
+      "token": "1|abcdef1234567890...",
+      "user": {
+        "id": "64bfcb2a8b3d67f40a1b2c3d",
+        "name": "John Doe",
+        "email": "john@example.com"
+      }
+    }
+    ```
+*(Note: Copy the `token` string and use it as `Bearer {{your_personal_access_token}}` in subsequent requests).*
+
+---
+
 ### GET /user (Get Profile)
 *   **Method**: `GET`
 *   **URL**: `{{baseUrl}}/user`
