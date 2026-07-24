@@ -66,7 +66,56 @@ new class extends Component {
             session()->flash('error', $e->getMessage());
         }
     }
+    /**
+     * 
+     */
 
+    /**
+     * Friendship functions
+     */
+
+    public function unfriend(string $friendId)
+    {
+        try {
+            app(FriendshipService::class)->unfriend(auth()->id(), $friendId);
+            $this->selectedConversationId = null;
+            session()->flash('success', 'Friend removed.');
+        } catch (\Exception $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function blockUser(string $friendId)
+    {
+        try {
+            app(FriendshipService::class)->blockUser(auth()->id(), $friendId);
+            $this->selectedConversationId = null;
+            session()->flash('success', 'User blocked.');
+        } catch (\Exception $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function unblockUser(string $friendId)
+    {
+        try {
+            app(FriendshipService::class)->unblockUser(auth()->id(), $friendId);
+            session()->flash('success', 'User unblocked.');
+        } catch (\Exception $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function toggleMute(string $friendId)
+    {
+        try {
+            $service = app(FriendshipService::class);
+            $service->muteUser(auth()->id(), $friendId);
+            session()->flash('success', 'Notifications muted.');
+        } catch (\Exception $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
     /**
      *
      */
@@ -112,9 +161,11 @@ new class extends Component {
 
     public function saveEncryptedMasterKey(string $encryptedString)
     {
-        auth()->user()->update([
-            'master_key' => $encryptedString 
-        ]);
+        auth()
+            ->user()
+            ->update([
+                'master_key' => $encryptedString,
+            ]);
     }
 
     public function getEncryptedMasterKey()
@@ -240,12 +291,12 @@ new class extends Component {
 
         $message = app(MessageService::class)->send([
             'conversation_id' => $this->selectedConversationId,
-            'sender_id'       => auth()->id(),
-            'body'            => $body,
-            'type'            => 'text',
-            'metadata'        => [
-                'nonce'        => $nonce,
-                'enc_keys'     => $encryptedKeys,
+            'sender_id' => auth()->id(),
+            'body' => $body,
+            'type' => 'text',
+            'metadata' => [
+                'nonce' => $nonce,
+                'enc_keys' => $encryptedKeys,
                 'is_encrypted' => !!$encryptedKeys,
             ],
         ]);
@@ -314,12 +365,12 @@ new class extends Component {
         init() {
             let userId = @js((string) auth()->id());
             this.isUnlocked = !!sessionStorage.getItem('e2e_recovery_' + userId);
-            
-            window.addEventListener('e2e-unlocked', () => { 
-                this.isUnlocked = true; 
-                this.hasMasterKey = true; 
+    
+            window.addEventListener('e2e-unlocked', () => {
+                this.isUnlocked = true;
+                this.hasMasterKey = true;
             });
-
+    
             window.Echo.private('user.' + userId).listen('IncomingRequest', (e) => {
                 $wire.$refresh();
             }).listen('LoadContactList', (e) => {
@@ -329,15 +380,22 @@ new class extends Component {
     }" x-on:friend-request-sent.window="showAddFriend = false"
     x-on:open-add-friend-modal.window="showAddFriend = true">
 
-    <div x-show="!isUnlocked" style="display:none;" class="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-gray-50/90 dark:bg-black/90 backdrop-blur-sm">
-        <div class="text-center p-8 bg-white dark:bg-[#1e1e21] rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 max-w-md">
+    <div x-show="!isUnlocked" style="display:none;"
+        class="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-gray-50/90 dark:bg-black/90 backdrop-blur-sm">
+        <div
+            class="text-center p-8 bg-white dark:bg-[#1e1e21] rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 max-w-md">
             <div class="w-16 h-16 bg-pink-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg class="w-8 h-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                    </path>
                 </svg>
             </div>
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2" x-text="hasMasterKey ? 'Unlock Messages' : 'Security Setup Required'"></h2>
-            <p class="text-gray-500 dark:text-[#a1a1aa] mb-6" x-text="hasMasterKey ? 'You must enter your Sync Password to unlock this session.' : 'You must set up your End-to-End Encryption key before you can send messages or add friends.'"></p>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                x-text="hasMasterKey ? 'Unlock Messages' : 'Security Setup Required'"></h2>
+            <p class="text-gray-500 dark:text-[#a1a1aa] mb-6"
+                x-text="hasMasterKey ? 'You must enter your Sync Password to unlock this session.' : 'You must set up your End-to-End Encryption key before you can send messages or add friends.'">
+            </p>
             <button
                 @click="
                     if (hasMasterKey) {
@@ -355,13 +413,15 @@ new class extends Component {
     </div>
 
     <!-- NAVIGATION RAIL -->
-    <div class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
+    <div
+        class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
 
         <div class="space-y-6 flex-1 flex flex-col items-center">
             <div class="mb-4 w-full flex justify-center items-center px-0">
                 <div class="p-2.5 text-pink-500 flex items-center justify-center">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                     </svg>
                 </div>
             </div>
@@ -404,7 +464,9 @@ new class extends Component {
 
         <div class="space-y-4 flex flex-col items-center">
             <button @click="$store.theme.toggle()" class="p-3 text-[#71717a] transition group relative">
-                <span x-show="$store.theme.current === 'dark'" class="material-symbols-outlined w-6 h-6 flex items-center justify-center" style="font-size: 24px;">sunny</span>
+                <span x-show="$store.theme.current === 'dark'"
+                    class="material-symbols-outlined w-6 h-6 flex items-center justify-center"
+                    style="font-size: 24px;">sunny</span>
                 <svg x-show="$store.theme.current === 'light'" class="w-6 h-6" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -594,7 +656,7 @@ new class extends Component {
                             window.notyf.error('No recovery key found. Please generate one in Settings.');
                             return;
                         }
-                        
+                
                         try {
                             const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
                             await $wire.savePublicKey(keyPair.publicKey);
@@ -621,7 +683,9 @@ new class extends Component {
                                 $othersMissing = collect($selected->participant_public_keys)
                                     ->forget(auth()->id())
                                     ->contains(null);
-                                $allKeysSet = count($selected->participant_public_keys) > 0 && !collect($selected->participant_public_keys)->contains(null);
+                                $allKeysSet =
+                                    count($selected->participant_public_keys) > 0 &&
+                                    !collect($selected->participant_public_keys)->contains(null);
                             @endphp
 
                             @if ($allKeysSet)
@@ -637,14 +701,16 @@ new class extends Component {
                             @elseif(!$myKey)
                                 <button type="button" @click="syncMyKey()"
                                     class="flex items-center gap-1 text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase tracking-wider transition-colors group/sec">
-                                    <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                     Update Your Keys
                                 </button>
                             @else
-                                <span class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
+                                <span
+                                    class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -652,9 +718,12 @@ new class extends Component {
                                     Standard (Waiting for keys)
                                 </span>
                             @endif
-                            
-                            <span x-show="isOnline" class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider" style="display:none;">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span>
+
+                            <span x-show="isOnline"
+                                class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider"
+                                style="display:none;">
+                                <span
+                                    class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span>
                                 Online
                             </span>
                         </div>
@@ -685,13 +754,58 @@ new class extends Component {
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                     </button>
-                    <button class="transition hidden md:block hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
-                            </path>
-                        </svg>
-                    </button>
+                    @if (!$isSelf && $otherUserId)
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open"
+                                class="transition hover:text-white focus:outline-none p-1 rounded-lg hover:bg-white/5">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
+                                    </path>
+                                </svg>
+                            </button>
+
+                            <div x-show="open" @click.away="open = false"
+                                x-transition:enter="transition ease-out duration-100"
+                                x-transition:enter-start="transform opacity-0 scale-95"
+                                x-transition:enter-end="transform opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-75"
+                                x-transition:leave-start="transform opacity-100 scale-100"
+                                x-transition:leave-end="transform opacity-0 scale-95"
+                                class="absolute right-0 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
+                                style="display: none;">
+                                <button wire:click="toggleMute('{{ $otherUserId }}')" @click="open = false"
+                                    class="w-full text-left px-4 py-2.5 text-xs font-semibold text-[#a1a1aa] hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition">
+                                    <svg class="w-4 h-4 text-[#71717a]" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                    </svg>
+                                    Mute Notifications
+                                </button>
+                                <button wire:click="unfriend('{{ $otherUserId }}')" @click="open = false"
+                                    class="w-full text-left px-4 py-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-400/10 flex items-center gap-2.5 transition border-t border-white/5">
+                                    <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6h12a6 6 0 00-6-6zM21 12h-6" />
+                                    </svg>
+                                    Remove Friend
+                                </button>
+                                <button wire:click="blockUser('{{ $otherUserId }}')" @click="open = false"
+                                    class="w-full text-left px-4 py-2.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 flex items-center gap-2.5 transition">
+                                    <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                    Block User
+                                </button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -782,7 +896,9 @@ new class extends Component {
                                                 @js((string) auth()->id())
                                             );
                                         }
-                                    }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
+                                    }"
+                                        class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full"
+                                        x-text="decryptedBody">
                                         {{ $message->body }}
                                     </div>
                                 </div>
@@ -805,7 +921,9 @@ new class extends Component {
                                                 @js((string) auth()->id())
                                             );
                                         }
-                                    }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
+                                    }"
+                                        class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full"
+                                        x-text="decryptedBody">
                                         {{ $message->body }}
                                     </div>
                                 </div>
@@ -849,193 +967,194 @@ new class extends Component {
                             Messages</span>
                     </div>
                 @endif
-                <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3" x-data="{
-                    maxSize: 10 * 1024 * 1024, // 10MB
-                    fileName: '',
-                    localBody: '',
-                    handleFile(e) {
-                        const file = e.target.files[0];
-                        if (!file) {
-                            this.fileName = '';
-                            return;
-                        }
-                        if (file.size > this.maxSize) {
-                            alert('File size exceeds 10MB limit.');
-                            e.target.value = '';
-                            this.fileName = '';
-                            return;
-                        }
-                        this.fileName = file.name;
-                    },
-                    removeFile() {
-                        document.getElementById('attachment-input').value = '';
-                        this.fileName = '';
-                    },
-
-                    // ── Key Cache ────────────────────────────────────────────────────────
-                    // Participant public keys are nearly static (only change on explicit key
-                    // regeneration). Caching them in sessionStorage avoids a Livewire round-
-                    // trip + MongoDB query on every single message send.
-                    // Cache is keyed by conversationId so switching conversations is isolated.
-                    _convId: @js((string) $this->selectedConversationId ?? ''),
-                    _cacheKey() { return 'e2e_keys_' + this._convId; },
-                    _readKeyCache() {
-                        try {
-                            const v = sessionStorage.getItem(this._cacheKey());
-                            return v ? JSON.parse(v) : null;
-                        } catch { return null; }
-                    },
-                    _writeKeyCache(keys) {
-                        try { sessionStorage.setItem(this._cacheKey(), JSON.stringify(keys)); }
-                        catch (e) { console.warn('E2E: Key cache write failed:', e); }
-                    },
-
-                    // ── Initialization ───────────────────────────────────────────────────
-                    // The PHP selectedConversation() computed property already queries participant
-                    // public keys as part of loading the conversation — that data is available in
-                    // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
-                    init() {
-                        const renderKeys = @js($selected->participant_public_keys ?? []);
-                        if (renderKeys && Object.keys(renderKeys).length > 0) {
-                            this._writeKeyCache(renderKeys);
-                        }
-                    },
-
-                    // ── Main send ────────────────────────────────────────────────────────
-                    async encryptAndSend() {
-                        const body = this.localBody;
-                        if (!body || !body.trim()) return;
-
-                        const userId = @js((string) auth()->id());
-                        let privateKey = sessionStorage.getItem('e2e_private_' + userId);
-                        let publicKey  = sessionStorage.getItem('e2e_public_'  + userId);
-
-                        // Recover keys from mnemonic if sessionStorage is empty (new tab / session wipe)
-                        if (!privateKey || !publicKey) {
-                            const mnemonic = sessionStorage.getItem('e2e_recovery_' + userId);
-                            if (mnemonic) {
-                                try {
-                                    const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
-                                    sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
-                                    sessionStorage.setItem('e2e_public_'  + userId, keyPair.publicKey);
-                                    privateKey = keyPair.privateKey;
-                                    publicKey  = keyPair.publicKey;
-                                    if (window._syncPublicKeyToServer) {
-                                        await window._syncPublicKeyToServer(publicKey);
-                                    }
-                                } catch (e) {
-                                    console.error('E2E: Failed to recover keys:', e);
-                                }
-                            }
-                        }
-
-                        // Cache-first key resolution:
-                        //   HIT  (all keys non-null) → use cache, zero server round-trips.
-                        //   MISS (cache empty or any key is null) → call getParticipantKeys(),
-                        //        write result back to cache, all future sends are free.
-                        let keys = this._readKeyCache();
-                        const cacheComplete = keys
-                            && Object.keys(keys).length > 0
-                            && Object.values(keys).every(k => !!k);
-
-                        if (!cacheComplete) {
-                            console.log('E2E: Key cache miss — fetching fresh keys from server.');
-                            try {
-                                keys = await $wire.getParticipantKeys();
-                                this._writeKeyCache(keys);
-                            } catch (e) {
-                                console.error('E2E: Failed to fetch participant keys:', e);
-                                keys = keys || @js($selected->participant_public_keys ?? []);
-                            }
-                        }
-
-                        // If our own key is missing from the map (e.g. previous sync failed or
-                        // key was just regenerated), inject it and push to server.
-                        if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
-                            console.warn('E2E: Own key mismatch — syncing to server.');
-                            if (window._syncPublicKeyToServer) {
-                                await window._syncPublicKeyToServer(publicKey);
-                            }
-                            keys[userId] = publicKey;
-                            this._writeKeyCache(keys); // keep cache consistent
-                        }
-
-                        const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
-                        const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
-
-                        if (canEncrypt) {
-                            let encResult = null;
-                            try {
-                                console.log('E2E: Encrypting message for ' + Object.keys(keys).length + ' recipient(s)...');
-                                encResult = await window.EncryptionService.encryptMessage(body, keys, privateKey);
-                            } catch (e) {
-                                console.error('E2E: Encryption failed — message NOT sent.', e);
-                                if (window.notyf) {
-                                    window.notyf.error('Encryption failed. Message not sent.');
-                                }
+                <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3"
+                    x-data="{
+                        maxSize: 10 * 1024 * 1024, // 10MB
+                        fileName: '',
+                        localBody: '',
+                        handleFile(e) {
+                            const file = e.target.files[0];
+                            if (!file) {
+                                this.fileName = '';
                                 return;
                             }
-
-                            try {
-                                await $wire.messageUser(encResult.encBody, encResult.nonce, encResult.keys);
-                            } catch (e) {
-                                // The encrypted message was likely already saved; the error came from
-                                // a Livewire post-send side-effect (e.g. scroll-bottom dispatch).
-                                console.warn('E2E: Post-send Livewire error (message was saved):', e);
+                            if (file.size > this.maxSize) {
+                                alert('File size exceeds 10MB limit.');
+                                e.target.value = '';
+                                this.fileName = '';
+                                return;
                             }
-
-                            this.localBody = '';
-                            this.removeFile();
-                        } else {
-                            console.warn('E2E: Cannot send — participant keys are missing.', {
-                                hasPrivateKey: !!privateKey,
-                                missingFrom: participantsMissingKeys.map(p => p[0])
-                            });
-                            if (window.notyf) {
-                                window.notyf.error('Cannot send: missing encryption keys for one or more participants.');
+                            this.fileName = file.name;
+                        },
+                        removeFile() {
+                            document.getElementById('attachment-input').value = '';
+                            this.fileName = '';
+                        },
+                    
+                        // ── Key Cache ────────────────────────────────────────────────────────
+                        // Participant public keys are nearly static (only change on explicit key
+                        // regeneration). Caching them in sessionStorage avoids a Livewire round-
+                        // trip + MongoDB query on every single message send.
+                        // Cache is keyed by conversationId so switching conversations is isolated.
+                        _convId: @js((string) $this->selectedConversationId ?? ''),
+                        _cacheKey() { return 'e2e_keys_' + this._convId; },
+                        _readKeyCache() {
+                            try {
+                                const v = sessionStorage.getItem(this._cacheKey());
+                                return v ? JSON.parse(v) : null;
+                            } catch { return null; }
+                        },
+                        _writeKeyCache(keys) {
+                            try { sessionStorage.setItem(this._cacheKey(), JSON.stringify(keys)); } catch (e) { console.warn('E2E: Key cache write failed:', e); }
+                        },
+                    
+                        // ── Initialization ───────────────────────────────────────────────────
+                        // The PHP selectedConversation() computed property already queries participant
+                        // public keys as part of loading the conversation — that data is available in
+                        // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
+                        init() {
+                            const renderKeys = @js($selected->participant_public_keys ?? []);
+                            if (renderKeys && Object.keys(renderKeys).length > 0) {
+                                this._writeKeyCache(renderKeys);
+                            }
+                        },
+                    
+                        // ── Main send ────────────────────────────────────────────────────────
+                        async encryptAndSend() {
+                            const body = this.localBody;
+                            if (!body || !body.trim()) return;
+                    
+                            const userId = @js((string) auth()->id());
+                            let privateKey = sessionStorage.getItem('e2e_private_' + userId);
+                            let publicKey = sessionStorage.getItem('e2e_public_' + userId);
+                    
+                            // Recover keys from mnemonic if sessionStorage is empty (new tab / session wipe)
+                            if (!privateKey || !publicKey) {
+                                const mnemonic = sessionStorage.getItem('e2e_recovery_' + userId);
+                                if (mnemonic) {
+                                    try {
+                                        const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                                        sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                                        sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                                        privateKey = keyPair.privateKey;
+                                        publicKey = keyPair.publicKey;
+                                        if (window._syncPublicKeyToServer) {
+                                            await window._syncPublicKeyToServer(publicKey);
+                                        }
+                                    } catch (e) {
+                                        console.error('E2E: Failed to recover keys:', e);
+                                    }
+                                }
+                            }
+                    
+                            // Cache-first key resolution:
+                            //   HIT  (all keys non-null) → use cache, zero server round-trips.
+                            //   MISS (cache empty or any key is null) → call getParticipantKeys(),
+                            //        write result back to cache, all future sends are free.
+                            let keys = this._readKeyCache();
+                            const cacheComplete = keys &&
+                                Object.keys(keys).length > 0 &&
+                                Object.values(keys).every(k => !!k);
+                    
+                            if (!cacheComplete) {
+                                console.log('E2E: Key cache miss — fetching fresh keys from server.');
+                                try {
+                                    keys = await $wire.getParticipantKeys();
+                                    this._writeKeyCache(keys);
+                                } catch (e) {
+                                    console.error('E2E: Failed to fetch participant keys:', e);
+                                    keys = keys || @js($selected->participant_public_keys ?? []);
+                                }
+                            }
+                    
+                            // If our own key is missing from the map (e.g. previous sync failed or
+                            // key was just regenerated), inject it and push to server.
+                            if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
+                                console.warn('E2E: Own key mismatch — syncing to server.');
+                                if (window._syncPublicKeyToServer) {
+                                    await window._syncPublicKeyToServer(publicKey);
+                                }
+                                keys[userId] = publicKey;
+                                this._writeKeyCache(keys); // keep cache consistent
+                            }
+                    
+                            const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
+                            const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
+                    
+                            if (canEncrypt) {
+                                let encResult = null;
+                                try {
+                                    console.log('E2E: Encrypting message for ' + Object.keys(keys).length + ' recipient(s)...');
+                                    encResult = await window.EncryptionService.encryptMessage(body, keys, privateKey);
+                                } catch (e) {
+                                    console.error('E2E: Encryption failed — message NOT sent.', e);
+                                    if (window.notyf) {
+                                        window.notyf.error('Encryption failed. Message not sent.');
+                                    }
+                                    return;
+                                }
+                    
+                                try {
+                                    await $wire.messageUser(encResult.encBody, encResult.nonce, encResult.keys);
+                                } catch (e) {
+                                    // The encrypted message was likely already saved; the error came from
+                                    // a Livewire post-send side-effect (e.g. scroll-bottom dispatch).
+                                    console.warn('E2E: Post-send Livewire error (message was saved):', e);
+                                }
+                    
+                                this.localBody = '';
+                                this.removeFile();
+                            } else {
+                                console.warn('E2E: Cannot send — participant keys are missing.', {
+                                    hasPrivateKey: !!privateKey,
+                                    missingFrom: participantsMissingKeys.map(p => p[0])
+                                });
+                                if (window.notyf) {
+                                    window.notyf.error('Cannot send: missing encryption keys for one or more participants.');
+                                }
                             }
                         }
-                    }
-                }">
-                <fieldset class="contents" :disabled="!isUnlocked">
-                    <div>
-                        <input type="file" id="attachment-input" class="hidden" @change="handleFile">
-                        <button type="button" @click="document.getElementById('attachment-input').click()"
-                            class="text-[#52525b] hover:text-white transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
-                                </path>
-                            </svg>
-                        </button>
-
-                        <!-- Simple file preview badge -->
-                        <div x-show="fileName"
-                            class="absolute bottom-full left-0 mb-2 bg-[#202024] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg"
-                            style="display: none;">
-                            <span class="text-xs text-white truncate max-w-[150px]" x-text="fileName"></span>
-                            <button type="button" @click="removeFile"
-                                class="text-[#71717a] hover:text-red-500 transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    }">
+                    <fieldset class="contents" :disabled="!isUnlocked">
+                        <div>
+                            <input type="file" id="attachment-input" class="hidden" @change="handleFile">
+                            <button type="button" @click="document.getElementById('attachment-input').click()"
+                                class="text-[#52525b] hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"></path>
+                                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                                    </path>
                                 </svg>
                             </button>
+
+                            <!-- Simple file preview badge -->
+                            <div x-show="fileName"
+                                class="absolute bottom-full left-0 mb-2 bg-[#202024] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg"
+                                style="display: none;">
+                                <span class="text-xs text-white truncate max-w-[150px]" x-text="fileName"></span>
+                                <button type="button" @click="removeFile"
+                                    class="text-[#71717a] hover:text-red-500 transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
-                        class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
-                        autocomplete="off">
+                        <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
+                            class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
+                            autocomplete="off">
 
-                    <button type="submit"
-                        class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        wire:loading.attr="disabled">
-                        <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                        </svg>
-                    </button>
-                </fieldset>
+                        <button type="submit"
+                            class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            wire:loading.attr="disabled">
+                            <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                            </svg>
+                        </button>
+                    </fieldset>
                 </form>
             </div>
             {{-- end isSelf footer check --}}
@@ -1043,7 +1162,8 @@ new class extends Component {
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-center space-y-4">
                     <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
-                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo">
+                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto"
+                            alt="SanCo Logo">
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-white">Your Chat Canvas</h2>
@@ -1088,7 +1208,8 @@ new class extends Component {
 
             <div class="relative flex bg-[#18181b] p-1 rounded-2xl mb-8 overflow-hidden">
                 <div class="absolute top-1 bottom-1 left-1 transition-all duration-300 ease-out bg-[#202024] rounded-xl shadow-sm z-0"
-                    :style="addFriendTab === 'id' ? 'width: calc(50% - 4px); left: 4px' : 'width: calc(50% - 4px); left: 50%'">
+                    :style="addFriendTab === 'id' ? 'width: calc(50% - 4px); left: 4px' :
+                        'width: calc(50% - 4px); left: 50%'">
                 </div>
 
                 <button @click="addFriendTab = 'id'"
@@ -1110,7 +1231,8 @@ new class extends Component {
                     <div class="w-1/2 flex-shrink-0 px-1">
                         <form wire:submit.prevent="addFriend" class="space-y-5">
                             <div class="space-y-2">
-                                <label class="text-[10px] font-bold text-[#71717a] uppercase tracking-wider ml-1">User Tag ID</label>
+                                <label class="text-[10px] font-bold text-[#71717a] uppercase tracking-wider ml-1">User
+                                    Tag ID</label>
                                 <div class="relative flex items-center">
                                     <span class="absolute left-4 text-pink-500 font-bold">@</span>
                                     <input type="text" wire:model="searchUserTag" placeholder="SanCo_usertag"
@@ -1140,13 +1262,16 @@ new class extends Component {
                                         <img src="{{ $searchResult->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($searchResult->name) }}"
                                             referrerpolicy="no-referrer"
                                             class="w-16 h-16 rounded-2xl border border-white/10 object-cover shadow-md">
-                                        <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#202024]"></div>
+                                        <div
+                                            class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#202024]">
+                                        </div>
                                     </div>
                                     <div class="mb-4">
                                         <h4 class="text-lg font-bold text-white tracking-tight">
                                             {{ $searchResult->name }}
                                         </h4>
-                                        <p class="text-[15px] text-pink-500 font-mono tracking-wider uppercase opacity-80">
+                                        <p
+                                            class="text-[15px] text-pink-500 font-mono tracking-wider uppercase opacity-80">
                                             {{ $searchResult->user_tag }}
                                         </p>
                                     </div>
@@ -1158,7 +1283,7 @@ new class extends Component {
                             @endif
                         </form>
                     </div>
- 
+
                     <div class="w-1/2 flex-shrink-0 px-1">
                         <div class="space-y-6">
                             <div class="bg-pink-500/5 border border-pink-500/10 rounded-2xl p-5">
@@ -1209,7 +1334,7 @@ new class extends Component {
                     </button>
                 </div>
             </div>
-        </div> 
+        </div>
     </div>{{-- end modal outer container --}}
 
     @include('livewire.messenger.settings-overlay')
