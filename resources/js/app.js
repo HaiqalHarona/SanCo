@@ -1,7 +1,9 @@
 import "./bootstrap";
 import "./encrypt";
 import { Notyf } from "notyf";
+import CryptoJS from "crypto-js";
 
+window.CryptoJS = CryptoJS;
 window.onlineUsers = new Set();
 
 // Helper: sync a public key to the server via Livewire or API fallback

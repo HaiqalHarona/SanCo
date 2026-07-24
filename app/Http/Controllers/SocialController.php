@@ -23,28 +23,28 @@ class SocialController extends Controller
             session()->forget('is_mobile');
         }
 
+        $driver = Socialite::driver($provider)->stateless();
+
         // Force account selection for both Google and GitHub to prevent auto-login
         if ($provider === 'google' || $provider === 'github') {
-            return Socialite::driver($provider)
-                ->with(['prompt' => 'select_account'])
-                ->redirect();
+            return $driver->with(['prompt' => 'select_account'])->redirect();
         }
 
-        return Socialite::driver($provider)->redirect();
+        return $driver->redirect();
     }
 
     public function callbackRequest($provider)
     {
         try {
-            $user = Socialite::driver($provider)->user();
+            $user = Socialite::driver($provider)->stateless()->user();
         } catch (\Exception $e) {
-            return redirect()->route('auth')->with('error', 'Login with '.ucfirst($provider).' failed. Please try again later.');
+            logger()->error('Socialite authentication error: ' . $e->getMessage(), ['exception' => $e]);
+            return redirect()->route('auth')->with('error', 'Login with '.ucfirst($provider).' failed: '.$e->getMessage());
         }
 
         $appUser = null;
 
         try {
-            $masterKey = implode(' ', BIP39::Generate(24)->words);
 
             if ($provider == 'google') {
                 $email = $user->getEmail();
@@ -63,7 +63,6 @@ class SocialController extends Controller
                         'name' => $user->getName(),
                         'avatar' => $user->getAvatar(),
                         'user_tag' => $this->generateUniqueTag('SanCo'),
-                        'master_key' => bcrypt($masterKey),
                     ]
                 );
             } elseif ($provider == 'github') {
@@ -78,7 +77,6 @@ class SocialController extends Controller
                         'email' => $user->getEmail(),
                         'avatar' => $user->getAvatar(),
                         'user_tag' => $this->generateUniqueTag('SanCo'),
-                        'master_key' => bcrypt($masterKey),
                     ]
                 );
             }
@@ -90,12 +88,19 @@ class SocialController extends Controller
                 $location = 'Unknown';
 
                 try {
-                    // Attempt to resolve IP to a physical location
-                    $response = file_get_contents("http://ip-api.com/json/{$ip}?fields=status,message,country,city");
-                    if ($response) {
-                        $data = json_decode($response, true);
-                        if ($data && $data['status'] === 'success') {
-                            $location = "{$data['city']}, {$data['country']}";
+                    // Only query location for public IPs, and set a short timeout to prevent login blocking
+                    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                        $context = stream_context_create([
+                            'http' => [
+                                'timeout' => 1.0, // 1 second timeout limit
+                            ]
+                        ]);
+                        $response = @file_get_contents("http://ip-api.com/json/{$ip}?fields=status,message,country,city", false, $context);
+                        if ($response) {
+                            $data = json_decode($response, true);
+                            if ($data && $data['status'] === 'success') {
+                                $location = "{$data['city']}, {$data['country']}";
+                            }
                         }
                     }
                 } catch (\Exception $e) {
@@ -114,9 +119,6 @@ class SocialController extends Controller
 
                     $token = $appUser->createToken('mobile-auth-token')->plainTextToken;
                     $redirectUrl = 'sanco://auth/callback?token=' . urlencode($token);
-                    if ($appUser->wasRecentlyCreated) {
-                        $redirectUrl .= '&new_master_key=' . urlencode($masterKey);
-                    }
                     return redirect($redirectUrl);
                 }
 
@@ -136,8 +138,7 @@ class SocialController extends Controller
 
                 if ($appUser->wasRecentlyCreated) {
                     return redirect()->route('messenger')
-                        ->with('new_master_key', $masterKey)
-                        ->with('success', 'Welcome! Your account has been created and secured.');
+                        ->with('success', 'Welcome! Your account has been created.');
                 }
                 return redirect()->route('messenger')->with('success', 'Welcome '. $appUser->name);
             }

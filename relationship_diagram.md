@@ -13,6 +13,8 @@ erDiagram
         datetime last_seen_at
         datetime created_at
         string user_tag "Unique public tag"
+        string master_key "Encrypted 24-word phrase (AES ciphertext)"
+        string public_key "Base64 Curve25519 public key"
     }
 
     CONVERSATION {

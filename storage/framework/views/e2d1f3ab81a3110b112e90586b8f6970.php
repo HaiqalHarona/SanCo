@@ -1,14 +1,14 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
-{{-- Outer wrapper: holds ALL Alpine state. No x-show here — always in DOM. --}}
+
 <div
     x-data="{
         activeTab: 'profile',
-        hasMasterKey: @js((bool) auth()->user()->master_key),
+        hasMasterKey: <?php echo \Illuminate\Support\Js::from((bool) auth()->user()->master_key)->toHtml() ?>,
 
         // --- PROFILE DATA ---
-        profileImagePreview: @js(auth()->user()->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode(auth()->user()->name)),
+        profileImagePreview: <?php echo \Illuminate\Support\Js::from(auth()->user()->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode(auth()->user()->name))->toHtml() ?>,
         cropper: null,
         showCropModal: false,
 
@@ -252,9 +252,7 @@
     x-init="initData()"
     x-on:open-security-tab.window="if (!recoveryKey && hasMasterKey) { unlockWithPassword(); }">
 
-    {{-- ═══════════════════════════════════════════════════════════
-         SETTINGS PANEL — has its own x-show so it animates in/out
-         ═══════════════════════════════════════════════════════════ --}}
+    
     <div x-show="showSettings"
         class="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-md dark:backdrop-blur-md"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
@@ -292,7 +290,7 @@
 
             <div class="p-6 md:p-10">
 
-                {{-- PROFILE TAB --}}
+                
                 <div x-show="activeTab === 'profile'" x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
                     class="space-y-10">
@@ -317,9 +315,9 @@
                         </div>
                         <div class="text-center sm:text-left pt-2">
                             <h4 class="text-gray-900 dark:text-white font-bold text-xl"
-                                x-text="$wire.profileName || '{{ auth()->user()->name }}'"></h4>
+                                x-text="$wire.profileName || '<?php echo e(auth()->user()->name); ?>'"></h4>
                             <p class="text-pink-500 dark:text-pink-400 text-sm font-medium mt-1">
-                                {{ auth()->user()->user_tag ?? '#NotSet' }}</p>
+                                <?php echo e(auth()->user()->user_tag ?? '#NotSet'); ?></p>
                             <label for="avatarUpload"
                                 class="inline-block mt-4 px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-white text-xs font-semibold rounded-lg transition-colors border border-gray-200 dark:border-white/10 cursor-pointer">Change
                                 Avatar</label>
@@ -339,7 +337,7 @@
                     </div>
                 </div>
 
-                {{-- SECURITY TAB --}}
+                
                 <div x-show="activeTab === 'security'" style="display:none;"
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
                     x-transition:enter-end="opacity-100 translate-y-0" class="space-y-8">
@@ -396,13 +394,13 @@
                                     </button>
                                 </div>
 
-                                {{-- Status Badge --}}
+                                
                                 <div class="flex items-center gap-2">
-                                    @if (auth()->user()->master_key && auth()->user()->public_key)
+                                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(auth()->user()->master_key && auth()->user()->public_key): ?>
                                         <span class="bg-emerald-500/10 text-emerald-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
                                             Active &amp; Synced
                                         </span>
-                                    @elseif(auth()->user()->master_key)
+                                    <?php elseif(auth()->user()->master_key): ?>
                                         <span class="bg-amber-500/10 text-amber-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
                                             Needs Sync
                                         </span>
@@ -410,16 +408,16 @@
                                             class="text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase underline">
                                             Sync Now
                                         </button>
-                                    @else
+                                    <?php else: ?>
                                         <span class="bg-red-500/10 text-red-500 text-[10px] px-2 py-1 rounded-md uppercase font-bold">
                                             Not Setup
                                         </span>
-                                    @endif
+                                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
-                        {{-- MASKED MULTILINE PHRASE BOX --}}
+                        
                         <div class="relative w-full" wire:ignore>
                             <div class="w-full bg-white dark:bg-[#1e1e21] border border-gray-200 dark:border-white/10 rounded-xl p-6 md:px-8 text-center font-mono text-gray-900 dark:text-pink-500 shadow-sm dark:shadow-inner transition-all duration-300 flex items-center justify-center min-h-[140px] overflow-hidden"
                                 :class="{ 'opacity-50': !recoveryKey }">
@@ -489,7 +487,7 @@
             </div>
         </div>
 
-        {{-- CROP MODAL --}}
+        
         <div x-show="showCropModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-md"
             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
             x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
@@ -516,12 +514,9 @@
             </div>
         </div>
 
-    </div>{{-- end settings panel x-show --}}
+    </div>
 
-    {{-- ═══════════════════════════════════════════════════════════════════════
-         PASSWORD MODAL — SIBLING to the settings panel, NOT inside its x-show.
-         This means it renders immediately without waiting for settings to open.
-         ═══════════════════════════════════════════════════════════════════════ --}}
+    
     <div x-show="showPasswordModal" style="display:none;"
          class="fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md"
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
@@ -553,7 +548,7 @@
 
             <div class="mt-5 space-y-3">
 
-                {{-- Password field --}}
+                
                 <div>
                     <label class="text-[10px] font-bold text-gray-500 dark:text-[#71717a] uppercase tracking-wider mb-1 block"
                            x-text="passwordModalType === 'set' ? 'New Password' : 'Password'"></label>
@@ -577,7 +572,7 @@
                     </div>
                 </div>
 
-                {{-- Strength meter — set mode only --}}
+                
                 <div x-show="passwordModalType === 'set' && passwordInput.length > 0" x-cloak class="space-y-1.5">
                     <div class="flex gap-1">
                         <template x-for="i in 5" :key="i">
@@ -598,7 +593,7 @@
                     </div>
                 </div>
 
-                {{-- Confirm password — set mode only --}}
+                
                 <div x-show="passwordModalType === 'set'" x-cloak>
                     <label class="text-[10px] font-bold text-gray-500 dark:text-[#71717a] uppercase tracking-wider mb-1 block">Confirm Password</label>
                     <div class="relative">
@@ -623,7 +618,7 @@
                     </div>
                 </div>
 
-                {{-- Error --}}
+                
                 <p x-show="passwordError" x-text="passwordError" x-cloak
                    class="text-xs text-red-500 font-semibold"></p>
 
@@ -641,6 +636,7 @@
                 </button>
             </div>
         </div>
-    </div>{{-- end password modal --}}
+    </div>
 
-</div>{{-- end outer x-data wrapper --}}
+</div>
+<?php /**PATH C:\Users\johan\Desktop\Laravel\SanCo\resources\views/livewire/messenger/settings-overlay.blade.php ENDPATH**/ ?>

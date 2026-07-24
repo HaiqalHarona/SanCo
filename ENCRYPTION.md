@@ -24,8 +24,9 @@ SanCo manages keys across three distinct layers, balancing security, convenience
 +----------------------------------------------------------------------------+
 |                          1. Master Mnemonic                                |
 |  - 24-word BIP39 Recovery Phrase                                           |
-|  - Saved in localStorage ('e2e_recovery_{userId}')                         |
-|  - Hashed server-side (bcrypt) for user recovery verification              |
+|  - Encrypted with user's Sync Password (AES) before sending to DB          |
+|  - Stored in MongoDB ('master_key' field)                                  |
+|  - Temporarily decrypted into sessionStorage ('e2e_recovery_{userId}')     |
 +----------------------------------------------------------------------------+
                                       |
                                       v (Derivation)
@@ -66,9 +67,9 @@ async deriveKeyPair(mnemonic) {
 ```
 
 ### 2.2 Storage Lifetimes & Isolation
-- **`localStorage`**: Stores `e2e_recovery_{userId}` containing the plaintext BIP39 mnemonic. This persists across tabs and browser restarts, preventing the user from needing to re-enter their recovery phrase every time they visit.
-- **`sessionStorage`**: Stores the derived `e2e_private_{userId}` and `e2e_public_{userId}` keys (Base64-encoded). This ensures that the private key exists only during the lifetime of the browser tab and is destroyed when the tab is closed.
+- **`sessionStorage`**: Stores `e2e_recovery_{userId}` (the plaintext BIP39 mnemonic) and the derived `e2e_private_{userId}` / `e2e_public_{userId}` keys (Base64-encoded). This ensures that sensitive cryptographic materials exist only during the lifetime of the browser tab and are destroyed when the tab is closed.
 - **`sessionStorage` Cache**: Stores cached participant public keys under `e2e_keys_{conversationId}` to prevent costly database queries and API calls on every keystroke.
+- **Database (MongoDB)**: Stores the user's `master_key` which is their 24-word phrase encrypted symmetrically using a Sync Password. The server cannot decrypt this.
 
 ### 2.3 Automated Session Scrubbing (Logout / Terminate)
 To prevent key leakage across multiple users on shared devices, any logout action or session termination triggers a browser-wide event to scrub all E2E artifacts:
@@ -77,22 +78,17 @@ To prevent key leakage across multiple users on shared devices, any logout actio
 window.addEventListener('logout', () => {
     const userId = window.userId;
     if (userId) {
-        localStorage.removeItem('e2e_recovery_' + userId);
+        sessionStorage.removeItem('e2e_recovery_' + userId);
         sessionStorage.removeItem('e2e_private_' + userId);
         sessionStorage.removeItem('e2e_public_' + userId);
     }
-    // Scrub all other E2E storage to prevent cross-account leakage
-    const lsKeysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('e2e_recovery_')) lsKeysToRemove.push(key);
-    }
-    lsKeysToRemove.forEach(k => localStorage.removeItem(k));
-
+    // Scrub all E2E session storage artifacts to prevent cross-account leakage
     const ssKeysToRemove = [];
     for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if (key && (key.startsWith('e2e_private_') || key.startsWith('e2e_public_'))) ssKeysToRemove.push(key);
+        if (key && (key.startsWith('e2e_recovery_') || key.startsWith('e2e_private_') || key.startsWith('e2e_public_') || key.startsWith('e2e_keys_'))) {
+            ssKeysToRemove.push(key);
+        }
     }
     ssKeysToRemove.forEach(k => sessionStorage.removeItem(k));
 });
@@ -104,7 +100,7 @@ To understand how the messaging content is locked (encrypted) and unlocked (decr
 
 | Key Type | What It Is | Stored Location | Locking / Unlocking Mechanics |
 | :--- | :--- | :--- | :--- |
-| **Master Recovery Key**<br>*(BIP39 Mnemonic)* | A human-readable 24-word phrase (e.g., `apple banana ...`). | **Client**: Browser `localStorage` (`e2e_recovery_{userId}`).<br>**Server**: Bcrypt-hashed representation (`master_key`) for verification. | **Derivation Key**: Not used to encrypt messages directly. Instead, it is the root seed from which the client derives the asymmetric Curve25519 keypair. |
+| **Master Recovery Key**<br>*(BIP39 Mnemonic)* | A human-readable 24-word phrase (e.g., `apple banana ...`). | **Client**: Browser `sessionStorage` (`e2e_recovery_{userId}`).<br>**Server**: Encrypted ciphertext using Sync Password (`master_key`). | **Derivation Key**: Not used to encrypt messages directly. Instead, it is the root seed from which the client derives the asymmetric Curve25519 keypair. |
 | **Curve25519 Public Key**<br>*(Asymmetric Key)* | A Base64-encoded representation of the Curve25519 public key. | **Client**: Browser memory / `sessionStorage`.<br>**Server**: Saved publicly in MongoDB on the User document (`public_key`). | **The Lock**: Shared publicly. When a sender transmits a message, their browser uses the recipient's **Public Key** to wrap and lock the message-specific symmetric key. |
 | **Curve25519 Private Key**<br>*(Asymmetric Key)* | A Base64-encoded representation of the Curve25519 private key. | **Client**: Browser `sessionStorage` (`e2e_private_{userId}`).<br>**Server**: **Never sent to the server.** | **The Unlocking Key**: Kept private. When you receive a message, your browser uses your **Private Key** to open the wrapped envelope and retrieve the symmetric key. |
 | **Message Symmetric Key**<br>*(`msgKey` / Ephemeral)* | A randomly generated 256-bit symmetric key. | **Client**: Exists only in transient memory during message processing. **Never stored.** | **Content Lock & Unlock**: Used to symmetrically encrypt the plaintext message body on sending, and decrypt the ciphertext back to plaintext on receiving. |
@@ -237,13 +233,13 @@ The application utilizes a **single-session enforcement model** combined with **
             ├────────────────────────────────────────────┐
             ▼ (Option A: Restore Existing Key)          ▼ (Option B: Rotate & Generate New Key)
 ┌───────────────────────────────────────────────────┐    ┌───────────────────────────────────────────────────┐
-│ 3a. User inputs/sets existing 24-word recovery    │    │ 3b. User clicks "Generate New Key" in settings    │
-│     phrase in localStorage.                       │    │     - Server generates new BIP39 phrase.          │
-│ 4a. User clicks "Sync Now" in Settings.           │    │     - Bcrypt-hashes master key on DB.             │
-│ 5a. Browser derives Curve25519 keypair and caches │    │ 4b. Browser saves new phrase in localStorage.     │
-│     private key in sessionStorage.                │    │ 5b. Browser derives new keypair and caches        │
-│ 6a. Browser checks/saves public key consistency   │    │     private key in sessionStorage.                │
-│     with the server.                              │    │ 6b. Browser saves public key to MongoDB.          │
+│ 3a. User enters Sync Password in UI Modal.       │    │ 3b. User sets Sync Password with strength check   │
+│ 4a. Browser retrieves encrypted master_key from   │    │     and confirmation in UI Modal.                 │
+│     DB and decrypts phrase using Sync Password.   │    │ 4b. Client generates 24-word BIP39 mnemonic.      │
+│ 5a. Browser derives Curve25519 keypair and caches │    │ 5b. Client encrypts phrase via AES with password  │
+│     private key in sessionStorage.                │    │     and saves encrypted ciphertext to MongoDB.    │
+│ 6a. Browser checks/saves public key consistency   │    │ 6b. Client derives keypair and syncs public key   │
+│     with the server.                              │    │     to MongoDB and keypair to sessionStorage.    │
 └───────────────────────────────────────────────────┘    └───────────────────────────────────────────────────┘
             │                                                                │
             └────────────────────────────────┬───────────────────────────────┘
@@ -264,17 +260,17 @@ The application utilizes a **single-session enforcement model** combined with **
    When the user logs into a new browser (Browser B), the server updates `current_session_id` on the user's document in MongoDB. The next time the user's old browser (Browser A) makes a request, the `DetectConcurrentLogins` middleware terminates the session, logs out the user, and redirects to the landing page. Crucially, Browser A's JS runtime intercepts this logout and cleanses all localStorage and sessionStorage keys. This prevents two active browsers from encrypting/decrypting messages under competing sessions or inconsistent keys.
 
 2. **Restoring the Key (Browser B Setup)**:
-   Since Browser B has no E2E keys initially, the user can either:
-   - **Restore Existing Key**: Paste their existing 24-word recovery mnemonic into localStorage under `e2e_recovery_{userId}` (via the developer tools console or setup) and click **Sync Now** in Settings. The client runs `deriveKeyPair(mnemonic)` which derives the identical Curve25519 public/private keys. The private key is saved to `sessionStorage` and E2EE is fully restored, preserving readability for historical messages.
-   - **Generate New Key (Key Rotation)**: Click **Generate New Key** in the settings panel. This prompts the server to generate a new BIP39 recovery mnemonic, hashes it, and stores the bcrypt hash in MongoDB. The client derives the new Curve25519 keypair, writes the mnemonic to `localStorage`, caches the private key in `sessionStorage`, and uploads the new public key.
+   Since Browser B has no E2E keys initially, the user is locked out of messaging features. The user can either:
+   - **Unlock Existing Key**: Enter Sync Password in the UI Modal (with real-time password reveal support). The browser fetches the encrypted `master_key` ciphertext from MongoDB, decrypts it locally using AES with the Sync Password, recovers the 24-word phrase into `sessionStorage`, and derives the Curve25519 keypair. E2EE is fully restored, preserving readability for historical messages.
+   - **Generate New Key (Key Rotation)**: Click **Generate New Key** in the settings panel. This prompts the user to set a new Sync Password (featuring live password strength meter and confirm field validation). The client generates a new 24-word BIP39 recovery mnemonic, derives the new Curve25519 keypair, caches the private key and mnemonic in `sessionStorage`, symmetrically encrypts the mnemonic using AES with the Sync Password, automatically uploads the encrypted ciphertext to `master_key` in MongoDB, and syncs the new public key.
 
    > [!WARNING]
    > **Historical Message Readability Constraint:**
-   > If the user chooses to **Generate a New Key** (Option B) on a new device/browser instead of restoring their existing mnemonic:
+   > If the user chooses to **Generate a New Key** (Option B) on a new device/browser instead of unlocking their existing key:
    > 1. A new asymmetric keypair is generated. The new private key is mathematically unrelated to the previous one.
    > 2. Historical messages that were sealed using the *old* public key **cannot** be decrypted using the *new* private key.
    > 3. Consequently, the user will lose the ability to read historical messages on that device.
-   > 4. To maintain access to old messages, the user **must** import their original 24-word Master Recovery Key, which derives the exact same private key.
+   > 4. To maintain access to old messages, the user **must** remember their Sync Password, or import their original 24-word Master Recovery Key.
 
 3. **Peer Key Cache Invalidation**:
    Peers sending messages check `sessionStorage` first for recipient public keys. When a user syncs a new public key to the server, the peer clients detect a mismatch or update on their next cache-miss check. They re-fetch the updated public key via the Livewire component `$wire.getParticipantKeys()`, update their local caches, and wrap subsequent message envelopes with the user's updated public key.
