@@ -159,6 +159,7 @@
                 await $wire.savePublicKey(keyPair.publicKey);
 
                 this.hasMasterKey = true;
+                this.showSettings = false;
                 window.dispatchEvent(new Event('e2e-unlocked'));
                 window.notyf.success('Encryption keys generated and synced!');
                 await $wire.$refresh();
@@ -250,7 +251,7 @@
         }
     }"
     x-init="initData()"
-    x-on:open-security-tab.window="if (!recoveryKey && hasMasterKey) { unlockWithPassword(); }">
+    x-on:open-security-tab.window="if (!recoveryKey && hasMasterKey) { unlockWithPassword(); } else if (!recoveryKey && !hasMasterKey) { generateKey(); }">
 
     {{-- ═══════════════════════════════════════════════════════════
          SETTINGS PANEL — has its own x-show so it animates in/out
@@ -281,6 +282,7 @@
                         @click="
                             activeTab = 'security';
                             if (!recoveryKey && hasMasterKey) { unlockWithPassword(); }
+                            else if (!recoveryKey && !hasMasterKey) { generateKey(); }
                         "
                         :class="activeTab === 'security' ? 'text-pink-500 border-pink-500' :
                             'text-gray-500 dark:text-[#a1a1aa] border-transparent hover:text-gray-900 dark:hover:text-white'"
