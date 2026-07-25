@@ -1,5 +1,6 @@
 import "./bootstrap";
 import "./encrypt";
+import "./motion";
 import { Notyf } from "notyf";
 import CryptoJS from "crypto-js";
 

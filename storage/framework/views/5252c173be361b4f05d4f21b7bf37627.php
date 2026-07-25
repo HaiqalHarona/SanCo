@@ -1,11 +1,3 @@
-<?php
-
-use function Livewire\Volt\layout;
-
-layout('layouts.auth');
-
-?>
-
 <div x-data="{ 
         mouseX: 0, 
         mouseY: 0,
@@ -18,37 +10,37 @@ layout('layouts.auth');
      @mousemove="handleMouseMove($event)"
      class="relative min-h-screen lg:h-screen lg:overflow-hidden bg-[#18181b] flex items-center justify-center p-4 font-sans overflow-hidden select-none">
 
-    {{-- Interactive Cursor Radial Spotlight Background --}}
+    
     <div class="pointer-events-none absolute inset-0 transition-opacity duration-500 opacity-70 z-0"
          :style="`background: radial-gradient(800px circle at ${mouseX}px ${mouseY}px, rgba(236,72,153,0.15), transparent 80%);`"></div>
 
-    {{-- Ambient Light Blob Orbs --}}
+    
     <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-pink-600/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0"></div>
     <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0" style="animation-delay: 1.5s;"></div>
 
-    {{-- CARD WRAPPER --}}
+    
     <div class="relative w-full max-w-7xl min-h-[500px] rounded-3xl overflow-hidden shadow-2xl shadow-black/60 flex flex-col md:flex-row border border-white/[0.06] z-10">
 
-        {{-- LEFT PANEL --}}
+        
         <div class="relative hidden md:block md:w-[55%] lg:w-[60%] xl:w-[65%] flex-shrink-0 overflow-hidden bg-[#18181b]">
-            {{-- Spacer image forcing natural aspect-ratio height natively --}}
-            <img src="{{ asset('images/auth/firstslide.png') }}" class="w-full h-auto max-h-[350px] md:max-h-[450px] lg:max-h-[600px] xl:max-h-[720px] object-cover invisible block" alt="">
+            
+            <img src="<?php echo e(asset('images/auth/firstslide.png')); ?>" class="w-full h-auto max-h-[350px] md:max-h-[450px] lg:max-h-[600px] xl:max-h-[720px] object-cover invisible block" alt="">
 
-            {{-- First Picture Content --}}
+            
             <div class="absolute inset-0 w-full h-full z-10">
                  
-                {{-- Background Image & Contrast Overlay --}}
+                
                 <div class="absolute inset-0 bg-[#18181b]">
-                    <img src="{{ asset('images/auth/firstslide.png') }}" class="w-full h-full object-cover" alt="Welcome background">
+                    <img src="<?php echo e(asset('images/auth/firstslide.png')); ?>" class="w-full h-full object-cover" alt="Welcome background">
                 </div>
                 <div class="absolute inset-0 bg-black/30 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                 <div class="absolute inset-0 opacity-[0.15]"
                     style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E'); background-size: 180px 180px;">
                 </div>
 
-                {{-- Panel content --}}
+                
                 <div class="relative z-10 flex flex-col justify-end h-full p-8 md:p-10">
-                    {{-- Center content --}}
+                    
                     <div class="space-y-5">
                         <div class="space-y-3">
                             <h2 class="text-white text-3xl md:text-4xl font-bold leading-tight tracking-tight">
@@ -59,32 +51,32 @@ layout('layouts.auth');
                             </p>
                         </div>
                         <div class="flex flex-wrap gap-2 pt-2">
-                            @foreach (['End-to-end encrypted','Real-time messaging','Cross-platform','The Developer Loves ❤️Nino Nakano❤️'] as $chip)
-                            <span class="px-3 py-1.5 rounded-full text-xs font-medium bg-white/10 text-white/60 border border-white/10 backdrop-blur-sm">{{ $chip }}</span>
-                            @endforeach
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = ['End-to-end encrypted','Real-time messaging','Cross-platform','The Developer Loves ❤️Nino Nakano❤️']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $chip): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                            <span class="px-3 py-1.5 rounded-full text-xs font-medium bg-white/10 text-white/60 border border-white/10 backdrop-blur-sm"><?php echo e($chip); ?></span>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- RIGHT PANEL (form) --}}
+        
         <div class="flex-1 bg-[#202024] flex flex-col justify-between px-8 md:px-12 py-10 relative overflow-hidden">
 
-            {{-- Subtle top border glow --}}
+            
             <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-px bg-gradient-to-r from-transparent via-pink-500/40 to-transparent"></div>
 
             <div class="w-full my-auto">
-                {{-- ---- FORM AREA ---- --}}
+                
                 <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
 
-                {{-- Heading --}}
+                
                 <div class="mb-10">
                     <h1 class="text-white text-2xl font-bold tracking-tight mb-2">Get Started</h1>
                     <p class="text-white/40 text-sm">Join the network or access your account instantly.</p>
                 </div>
 
-                {{-- Terms Checkbox --}}
+                
                 <label class="flex items-start gap-3.5 text-left mb-6 cursor-pointer group">
                     <div class="relative flex items-center justify-center mt-0.5 shrink-0">
                         <input type="checkbox" x-model="agreed" class="appearance-none w-5 h-5 border-2 border-white/20 rounded bg-white/5 checked:bg-white checked:border-white transition-all cursor-pointer peer">
@@ -97,16 +89,16 @@ layout('layouts.auth');
                     </span>
                 </label>
 
-                {{-- Social buttons --}}
+                
                 <div class="space-y-3">
-                    <a href="{{ route('social.redirect', 'google') }}" 
+                    <a href="<?php echo e(route('social.redirect', 'google')); ?>" 
                        :class="agreed ? 'opacity-100 hover:bg-white/90 active:scale-[0.98]' : 'opacity-40 pointer-events-none cursor-not-allowed'"
                        class="flex items-center justify-center gap-3 w-full px-4 py-3.5 rounded-xl bg-white text-[#18181b] text-sm font-bold transition-all duration-300 shadow-lg shadow-black/30">
                         <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                         Continue with Google
                     </a>
 
-                    <a href="{{ route('social.redirect', 'github') }}" 
+                    <a href="<?php echo e(route('social.redirect', 'github')); ?>" 
                        :class="agreed ? 'opacity-100 hover:bg-[#333] active:scale-[0.98]' : 'opacity-40 pointer-events-none cursor-not-allowed'"
                        class="flex items-center justify-center gap-3 w-full px-4 py-3.5 rounded-xl bg-[#24292e] text-white text-sm font-bold transition-all duration-300 shadow-lg shadow-black/30 border border-white/10">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.379.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg>
@@ -114,38 +106,38 @@ layout('layouts.auth');
                     </a>
                 </div>
 
-                @if (config('app.allow_dev_login'))
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(config('app.allow_dev_login')): ?>
                     <div class="mt-8 p-4 bg-white/5 rounded-2xl border border-white/10 text-left">
                         <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-2 text-white/60">Developer Quick Login</h3>
                         <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                            @php $devUsers = \App\Models\User::limit(6)->get(); @endphp
-                            @if ($devUsers->isEmpty())
+                            <?php $devUsers = \App\Models\User::limit(6)->get(); ?>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($devUsers->isEmpty()): ?>
                                 <p class="text-white/40 text-xs italic">No users seeded yet. Run php artisan db:seed</p>
-                            @else
-                                @foreach ($devUsers as $devUser)
-                                    <a href="{{ route('auth.dev-login', $devUser->id) }}" class="block w-full text-left px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-white/80 text-xs transition-all truncate hover:translate-x-1 duration-200">
-                                        <span class="font-bold text-white">{{ $devUser->name }}</span>
-                                        <span class="block text-[10px] text-white/40">{{ $devUser->email ?? 'No email' }}</span>
+                            <?php else: ?>
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = $devUsers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $devUser): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                                    <a href="<?php echo e(route('auth.dev-login', $devUser->id)); ?>" class="block w-full text-left px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-white/80 text-xs transition-all truncate hover:translate-x-1 duration-200">
+                                        <span class="font-bold text-white"><?php echo e($devUser->name); ?></span>
+                                        <span class="block text-[10px] text-white/40"><?php echo e($devUser->email ?? 'No email'); ?></span>
                                     </a>
-                                @endforeach
-                            @endif
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         </div>
                     </div>
-                @endif
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                 </div>
             </div>
 
-            {{-- Footer Copyright --}}
+            
             <div class="text-xs text-white/40 font-medium text-center pt-4">
-                &copy; {{ date('Y') }} SanCo. Created by <a href="https://github.com/HaiqalHarona" target="_blank" rel="noopener noreferrer" class="text-white/70 hover:text-pink-400 font-semibold transition-colors underline underline-offset-2">HaiqalHarona</a>
+                &copy; <?php echo e(date('Y')); ?> SanCo. Created by <a href="https://github.com/HaiqalHarona" target="_blank" rel="noopener noreferrer" class="text-white/70 hover:text-pink-400 font-semibold transition-colors underline underline-offset-2">HaiqalHarona</a>
             </div>
 
             </div>
         </div>
     </div>
 
-    {{-- global transition helper for absolute positioned leave --}}
+    
     <style>
         /* Custom scrollbar for the whole page */
         ::-webkit-scrollbar { width: 4px; }
@@ -153,4 +145,4 @@ layout('layouts.auth');
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
     </style>
 
-</div>
+</div><?php /**PATH C:\Users\johan\Desktop\Laravel\SanCo\resources\views\livewire/auth.blade.php ENDPATH**/ ?>
