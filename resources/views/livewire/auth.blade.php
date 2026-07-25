@@ -11,35 +11,13 @@ layout('layouts.auth');
     {{-- CARD WRAPPER --}}
     <div class="relative w-full max-w-7xl min-h-[500px] rounded-3xl overflow-hidden shadow-2xl shadow-black/60 flex flex-col md:flex-row border border-white/[0.06]">
 
-        {{-- LEFT PANEL (slideshow) --}}
-        <div class="relative hidden md:block md:w-[55%] lg:w-[60%] xl:w-[65%] flex-shrink-0 overflow-hidden bg-[#18181b]"
-            x-data="{
-                slide: 0,
-                slides: 3,
-                nextSlide() {
-                    this.slide = (this.slide + 1) % this.slides;
-                    let delay = this.slide === 0 ? 6000 : 3500;
-                    setTimeout(() => this.nextSlide(), delay);
-                },
-                init() {
-                    setTimeout(() => this.nextSlide(), 6000);
-                }
-            }"
-        >
+        {{-- LEFT PANEL --}}
+        <div class="relative hidden md:block md:w-[55%] lg:w-[60%] xl:w-[65%] flex-shrink-0 overflow-hidden bg-[#18181b]">
             {{-- Spacer image forcing natural aspect-ratio height natively --}}
             <img src="{{ asset('images/auth/firstslide.png') }}" class="w-full h-auto max-h-[350px] md:max-h-[450px] lg:max-h-[600px] xl:max-h-[720px] object-cover invisible block" alt="">
 
-            {{-- Slide 0: Welcome Text & Gradients --}}
-            <div x-show="slide === 0" 
-                 x-transition:enter="transition-opacity ease-out duration-[1500ms]" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="transition-opacity ease-in duration-[1500ms]" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 class="absolute inset-0 w-full h-full z-10"
-                 style="display: none;"
-                 x-init="$el.style.display = 'block'">
+            {{-- First Picture Content --}}
+            <div class="absolute inset-0 w-full h-full z-10">
                  
                 {{-- Background Image & Contrast Overlay --}}
                 <div class="absolute inset-0 bg-[#18181b]">
@@ -50,7 +28,7 @@ layout('layouts.auth');
                     style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E'); background-size: 180px 180px;">
                 </div>
 
-                {{-- Sliding panel content --}}
+                {{-- Panel content --}}
                 <div class="relative z-10 flex flex-col justify-between h-full p-8 md:p-10">
                     {{-- Logo --}}
                     <div class="flex items-center gap-3">
@@ -75,34 +53,6 @@ layout('layouts.auth');
                     </div>
                 </div>
             </div>
-
-            {{-- Slide 1: Image 1 --}}
-            <div x-show="slide === 1" 
-                 x-transition:enter="transition-opacity ease-out duration-[1500ms]" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="transition-opacity ease-in duration-[1500ms]" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 style="display: none;"
-                 class="absolute inset-0 w-full h-full bg-[#18181b] z-10">
-                <img src="{{ asset('images/auth/2nd.png') }}" class="w-full h-full object-cover" alt="Auth image 1">
-            </div>
-
-            {{-- Slide 2: Image 2 --}}
-            <div x-show="slide === 2" 
-                 x-transition:enter="transition-opacity ease-out duration-[1500ms]" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="transition-opacity ease-in duration-[1500ms]" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 style="display: none;"
-                 class="absolute inset-0 w-full h-full bg-[#18181b] z-10">
-                <img src="{{ asset('images/auth/3rd.png') }}" class="w-full h-full object-cover lg:object-[50%_42%] xl:object-[50%_40%]" alt="Auth image 2">
-            </div>
-
-
         </div>
 
         {{-- RIGHT PANEL (form) --}}

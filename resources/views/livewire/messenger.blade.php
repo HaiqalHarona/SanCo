@@ -1,6 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
+use Livewire\Attributes\Url;
 use App\Livewire\MessengerVolt\PendingRequests;
 use App\Livewire\MessengerVolt\FriendActions;
 use App\Livewire\MessengerVolt\SettingsActions;
@@ -12,6 +13,7 @@ new class extends Component {
     use SettingsActions;
     use MessagingActions;
 
+    #[Url(as: 'c')]
     public $selectedConversationId = null;
     public $loadLimit = 20;
 
@@ -52,6 +54,12 @@ new class extends Component {
                 this.isUnlocked = true;
                 this.hasMasterKey = true;
             });
+
+            if (!this.hasMasterKey && !this.isUnlocked) {
+                this.$nextTick(() => {
+                    window.dispatchEvent(new Event('open-security-tab'));
+                });
+            }
     
             window.Echo.private('user.' + userId).listen('IncomingRequest', (e) => {
                 $wire.$refresh();
