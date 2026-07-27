@@ -42,14 +42,15 @@
                         class="pb-4 text-sm font-bold transition-all relative flex items-center gap-2"
                         :class="requestTab === 'incoming' ? ($store.theme.current === 'dark' ? 'text-white' : 'text-gray-900') : ($store.theme.current === 'dark' ? 'text-[#71717a] hover:text-white' : 'text-gray-500 hover:text-gray-900')">
                         Incoming
-                        @if($this->incomingRequest->count() > 0)
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($this->incomingRequest->count() > 0): ?>
                             <span class="px-2 py-0.5 rounded-full text-[10px] transition-colors"
                                 :class="requestTab === 'incoming' ? 'bg-pink-500 text-white' : ($store.theme.current === 'dark' ? 'bg-white/10 text-[#71717a]' : 'bg-gray-200 text-gray-500')">
-                                {{ $this->incomingRequest->count() }}
-                            </span>
-                        @elseif($this->incomingRequest->count() === 0)
+                                <?php echo e($this->incomingRequest->count()); ?>
 
-                        @endif
+                            </span>
+                        <?php elseif($this->incomingRequest->count() === 0): ?>
+
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         <div x-show="requestTab === 'incoming'"
                             class="absolute bottom-0 left-0 w-full h-0.5 bg-pink-500 rounded-t-full transition-transform duration-300">
                         </div>
@@ -59,14 +60,15 @@
                         class="pb-4 text-sm font-bold transition-all relative flex items-center gap-2"
                         :class="requestTab === 'sent' ? ($store.theme.current === 'dark' ? 'text-white' : 'text-gray-900') : ($store.theme.current === 'dark' ? 'text-[#71717a] hover:text-white' : 'text-gray-500 hover:text-gray-900')">
                         Sent
-                        @if($this->sentRequest->count() > 0)
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($this->sentRequest->count() > 0): ?>
                             <span class="px-2 py-0.5 rounded-full text-[10px] transition-colors"
                                 :class="requestTab === 'sent' ? 'bg-pink-500 text-white' : ($store.theme.current === 'dark' ? 'bg-white/10 text-[#71717a]' : 'bg-gray-200 text-gray-500')">
-                                {{ $this->sentRequest->count() }}
-                            </span>
-                        @elseif($this->sentRequest->count() === 0)
+                                <?php echo e($this->sentRequest->count()); ?>
 
-                        @endif
+                            </span>
+                        <?php elseif($this->sentRequest->count() === 0): ?>
+
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         <div x-show="requestTab === 'sent'" style="display:none;"
                             class="absolute bottom-0 left-0 w-full h-0.5 bg-pink-500 rounded-t-full transition-transform duration-300">
                         </div>
@@ -79,51 +81,53 @@
                     x-transition:enter-end="opacity-100 translate-y-0">
 
                     <div class="w-full">
-                        @forelse ($this->incomingRequest as $req)
-                            {{-- Open the grid only on the first iteration --}}
-                            @if($loop->first)
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $this->incomingRequest; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $req): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                            
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($loop->first): ?>
                                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                            @endif
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                                 <div class="border rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:shadow-xl"
                                     :class="$store.theme.current === 'dark' ? 'bg-[#1e1e21] border-white/5 hover:border-white/10 hover:shadow-black/20' : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-gray-200/50'">
 
-                                    <img src="{{ optional($req->user)->avatar ?? Storage::url('images/fallback-image/fallback.png') }}"
+                                    <img src="<?php echo e(optional($req->user)->avatar ?? Storage::url('images/fallback-image/fallback.png')); ?>"
                                         referrerpolicy="no-referrer"
                                         class="w-24 h-24 rounded-full object-cover shadow-md mb-4 border-2"
                                         :class="$store.theme.current === 'dark' ? 'border-[#2a2a2d]' : 'border-gray-50'">
 
                                     <h3 class="text-xl font-bold"
                                         :class="$store.theme.current === 'dark' ? 'text-white' : 'text-gray-900'">
-                                        {{ optional($req->user)->name ?? 'Deleted User' }}
+                                        <?php echo e(optional($req->user)->name ?? 'Deleted User'); ?>
+
                                     </h3>
 
                                     <p class="text-[12px] font-mono tracking-wide mt-1.5 mb-6 px-3 py-1 rounded-md"
                                         :class="$store.theme.current === 'dark' ? 'text-pink-500 bg-pink-500/10' : 'text-pink-600 bg-pink-50'">
-                                        {{ optional($req->user)->user_tag ?? 'Deleted User' }}
+                                        <?php echo e(optional($req->user)->user_tag ?? 'Deleted User'); ?>
+
                                     </p>
 
                                     <div class="flex items-center gap-3 w-full">
                                         <button class="flex-1 py-3 text-xs font-bold rounded-xl transition-colors"
                                             :class="$store.theme.current === 'dark' ? 'bg-[#2a2a2d] hover:bg-[#3f3f46] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'"
-                                            wire:click="rejectRequest('{{ $req->user_id }}')">
+                                            wire:click="rejectRequest('<?php echo e($req->user_id); ?>')">
                                             DECLINE
                                         </button>
                                         <button
                                             class="flex-1 py-3 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-xl transition-colors shadow-lg active:scale-[0.98]"
                                             :class="$store.theme.current === 'dark' ? 'shadow-pink-500/20' : 'shadow-pink-500/30'"
-                                            wire:click="acceptRequest('{{ $req->user_id }}')">
+                                            wire:click="acceptRequest('<?php echo e($req->user_id); ?>')">
                                             ACCEPT
                                         </button>
                                     </div>
                                 </div>
 
-                                {{-- Close the grid on the last iteration --}}
-                                @if($loop->last)
+                                
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($loop->last): ?>
                                     </div>
-                                @endif
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
-                        @empty
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
                             <div class="flex flex-col items-center justify-center h-96 w-full text-center">
                                 <div class="p-6 bg-pink-500/5 rounded-full mb-4">
                                     <svg class="w-12 h-12 text-pink-500/50" fill="none" stroke="currentColor"
@@ -141,7 +145,7 @@
                                     When people send you friend requests, they will appear here.
                                 </p>
                             </div>
-                        @endforelse
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </div>
                 </div>
 
@@ -151,11 +155,11 @@
                     x-transition:enter-end="opacity-100 translate-y-0">
 
                     <div class="w-full">
-                        @forelse ($this->sentRequest as $sent)
-                            {{-- Open the grid only on the first iteration --}}
-                            @if($loop->first)
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $this->sentRequest; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sent): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                            
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($loop->first): ?>
                                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                            @endif
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                                 <div class="border rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:shadow-xl"
                                     :class="$store.theme.current === 'dark' ? 'bg-[#1e1e21] border-white/5 hover:border-white/10 hover:shadow-black/20' : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-gray-200/50'">
@@ -167,29 +171,31 @@
                                         </span>
                                     </div>
 
-                                    {{-- Dynamic Avatar from your Friendship -> User relationship --}}
-                                    <img src="{{ optional($sent->friend)->avatar ?? Storage::url('images/fallback-image/fallback.png') }}"
+                                    
+                                    <img src="<?php echo e(optional($sent->friend)->avatar ?? Storage::url('images/fallback-image/fallback.png')); ?>"
                                         referrerpolicy="no-referrer"
                                         class="w-20 h-20 rounded-full object-cover shadow-md mb-4 border-2"
                                         :class="$store.theme.current === 'dark' ? 'border-[#2a2a2d]' : 'border-gray-50'">
 
                                     <h3 class="text-xl font-bold"
                                         :class="$store.theme.current === 'dark' ? 'text-white' : 'text-gray-900'">
-                                        {{ optional($sent->friend)->name ?? 'Deleted User' }}
+                                        <?php echo e(optional($sent->friend)->name ?? 'Deleted User'); ?>
+
                                     </h3>
 
                                     <p class="text-[12px] font-mono tracking-wide mt-1.5 mb-6 px-3 py-1 rounded-md"
                                         :class="$store.theme.current === 'dark' ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'">
-                                        {{ optional($sent->friend)->user_tag ?? 'Deleted User' }}
+                                        <?php echo e(optional($sent->friend)->user_tag ?? 'Deleted User'); ?>
+
                                     </p>
                                 </div>
 
-                                {{-- Close the grid on the last iteration --}}
-                                @if($loop->last)
+                                
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($loop->last): ?>
                                     </div>
-                                @endif
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
-                        @empty
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
 
                             <div class="flex flex-col items-center justify-center h-96 w-full text-center">
                                 <div class="p-6 bg-blue-500/5 rounded-full mb-4">
@@ -207,10 +213,10 @@
                                     You haven't sent any friend requests yet.
                                 </p>
                             </div>
-                        @endforelse
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</div><?php /**PATH C:\Users\johan\Desktop\Laravel\SanCo\resources\views/livewire/messenger/pending-requests-overlay.blade.php ENDPATH**/ ?>

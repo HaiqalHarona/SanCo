@@ -32,34 +32,16 @@
             overflow: hidden;
         }
 
-        /* Ambient glow blobs */
-        .blob {
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(120px);
-            opacity: 0.18;
-            pointer-events: none;
-            animation: drift 14s ease-in-out infinite alternate;
-        }
-        .blob-1 { width: 520px; height: 520px; background: #ec4899; top: -160px; left: -160px; }
-        .blob-2 { width: 400px; height: 400px; background: #8b5cf6; bottom: -120px; right: -120px; animation-delay: -7s; }
-
-        @keyframes drift {
-            from { transform: translate(0, 0) scale(1); }
-            to   { transform: translate(40px, 30px) scale(1.08); }
-        }
-
         /* Card */
         .card {
             position: relative;
             z-index: 10;
             text-align: center;
             padding: 3.5rem 4rem;
-            background: rgba(30, 30, 33, 0.75);
-            border: 1px solid rgba(255,255,255,0.07);
+            background: #1e1e21;
+            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 1.5rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+            box-shadow: 0 32px 80px rgba(0,0,0,0.6);
             max-width: 480px;
             width: 90%;
             animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) both;
@@ -76,10 +58,7 @@
             font-weight: 800;
             letter-spacing: -4px;
             line-height: 1;
-            background: linear-gradient(135deg, #ec4899, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #ec4899;
             margin-bottom: 0.5rem;
             user-select: none;
         }
@@ -111,15 +90,15 @@
             font-weight: 600;
             cursor: pointer;
             text-decoration: none;
-            background: linear-gradient(135deg, #ec4899, #8b5cf6);
+            background-color: #ec4899;
             color: #fff;
             box-shadow: 0 4px 20px rgba(236, 72, 153, 0.3);
             transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
         }
         .btn:hover {
             transform: translateY(-2px);
+            background-color: #db2777;
             box-shadow: 0 8px 28px rgba(236, 72, 153, 0.45);
-            opacity: 0.92;
         }
         .btn:active { transform: translateY(0); }
 
@@ -140,24 +119,20 @@
             width: 40px;
             height: 3px;
             border-radius: 999px;
-            background: linear-gradient(90deg, #ec4899, #8b5cf6);
+            background-color: #ec4899;
             margin: 0 auto 1.4rem;
         }
     </style>
 </head>
 
 <body>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-
     <div class="card">
         <span class="icon">🔍</span>
         <div class="error-code">404</div>
         <div class="divider"></div>
         <p class="title">Page Not Found</p>
         <p class="subtitle">
-            The page you're looking for doesn't exist or<br>
-            you may not have permission to view it.
+            The page you're looking for doesn't exist.
         </p>
         <a href="<?php echo e(url('/')); ?>" class="btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

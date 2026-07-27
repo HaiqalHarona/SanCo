@@ -7,33 +7,6 @@ use App\Livewire\MessengerVolt\FriendActions;
 use App\Livewire\MessengerVolt\SettingsActions;
 use App\Livewire\MessengerVolt\MessagingActions;
 
-new class extends Component {
-    use PendingRequests;
-    use FriendActions;
-    use SettingsActions;
-    use MessagingActions;
-
-    #[Url(as: 'c')]
-    public $selectedConversationId = null;
-    public $loadLimit = 20;
-
-    public function layout()
-    {
-        return 'layouts.app';
-    }
-
-    public function mount()
-    {
-        $this->profileName = auth()->user()->name;
-
-        if (request()->has('join')) {
-            $this->searchUserTag = request()->query('join');
-            $this->searchContact();
-            $this->dispatch('open-add-friend-modal');
-        }
-    }
-};
-
 ?>
 
 <div class="flex h-full w-full bg-white dark:bg-[#18181b] overflow-hidden antialiased text-gray-900 dark:text-white"
@@ -44,7 +17,7 @@ new class extends Component {
         showAddFriend: false,
         addFriendTab: 'id',
         isUnlocked: false,
-        hasMasterKey: @js((bool) auth()->user()->master_key),
+        hasMasterKey: <?php echo \Illuminate\Support\Js::from((bool) auth()->user()->master_key)->toHtml() ?>,
         sidebarWidth: parseInt(localStorage.getItem('messenger_sidebar_width')) || 380,
         isSidebarCollapsed: localStorage.getItem('messenger_sidebar_collapsed') === 'true',
         isResizing: false,
@@ -77,7 +50,7 @@ new class extends Component {
         },
     
         init() {
-            let userId = @js((string) auth()->id());
+            let userId = <?php echo \Illuminate\Support\Js::from((string) auth()->id())->toHtml() ?>;
             this.isUnlocked = !!sessionStorage.getItem('e2e_recovery_' + userId);
     
             window.addEventListener('e2e-unlocked', () => {
@@ -110,7 +83,7 @@ new class extends Component {
                 .listen('LoadContactList', () => $wire.reloadContacts())
                 .listen('.LoadContactList', () => $wire.reloadContacts())
                 .listen('MessageSent', (e) => {
-                    const activeConvo = @js((string) $this->selectedConversationId);
+                    const activeConvo = <?php echo \Illuminate\Support\Js::from((string) $this->selectedConversationId)->toHtml() ?>;
                     if (e && e.conversationId && String(e.conversationId) === String(activeConvo)) {
                         debouncedRefresh(true);
                     } else {
@@ -118,7 +91,7 @@ new class extends Component {
                     }
                 })
                 .listen('.MessageSent', (e) => {
-                    const activeConvo = @js((string) $this->selectedConversationId);
+                    const activeConvo = <?php echo \Illuminate\Support\Js::from((string) $this->selectedConversationId)->toHtml() ?>;
                     if (e && e.conversationId && String(e.conversationId) === String(activeConvo)) {
                         debouncedRefresh(true);
                     } else {
@@ -182,14 +155,14 @@ new class extends Component {
                         d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
                     </path>
                 </svg>
-                @if ($this->incomingRequest->count() > 0)
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($this->incomingRequest->count() > 0): ?>
                     <span
                         class="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-medium text-white">
-                        {{ $this->incomingRequest->count() }}</span>
-                @elseif($this->incomingRequest->count() > 99)
+                        <?php echo e($this->incomingRequest->count()); ?></span>
+                <?php elseif($this->incomingRequest->count() > 99): ?>
                     <span
                         class="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-medium text-white">99+</span>
-                @endif
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 <span
                     class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
                     Requests
@@ -198,14 +171,14 @@ new class extends Component {
 
             <button class="p-3 text-[#71717a] hover:text-white hover:bg-white/5 rounded-xl transition relative group" title="Create Group">
                 <span class="block w-6 h-6 bg-[#71717a] group-hover:bg-white transition"
-                    style="-webkit-mask-image: url('{{ asset('images/messenger/group.svg') }}'); mask-image: url('{{ asset('images/messenger/group.svg') }}'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
+                    style="-webkit-mask-image: url('<?php echo e(asset('images/messenger/group.svg')); ?>'); mask-image: url('<?php echo e(asset('images/messenger/group.svg')); ?>'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
                 <span class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Create Group</span>
             </button>
 
             <button @click="showAddFriend = true"
                 class="p-3 text-[#71717a] hover:text-white hover:bg-white/5 rounded-xl transition relative group" title="Add Friend">
                 <span class="block w-6 h-6 bg-[#71717a] group-hover:bg-white transition"
-                    style="-webkit-mask-image: url('{{ asset('images/messenger/person_add.svg') }}'); mask-image: url('{{ asset('images/messenger/person_add.svg') }}'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
+                    style="-webkit-mask-image: url('<?php echo e(asset('images/messenger/person_add.svg')); ?>'); mask-image: url('<?php echo e(asset('images/messenger/person_add.svg')); ?>'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
                 <span class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Add Friend</span>
             </button>
         </div>
@@ -236,7 +209,7 @@ new class extends Component {
                     class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Settings</span>
             </button>
 
-            <a href="{{ route('logout') }}"
+            <a href="<?php echo e(route('logout')); ?>"
                 onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('logout')); document.getElementById('logout-form').submit();"
                 class="p-3 text-[#71717a] hover:text-red-500 transition group relative inline-block cursor-pointer">
 
@@ -253,8 +226,8 @@ new class extends Component {
                 </span>
             </a>
 
-            <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
-                @csrf
+            <form id="logout-form" action="<?php echo e(route('logout')); ?>" method="POST" class="hidden">
+                <?php echo csrf_field(); ?>
             </form>
         </div>
     </div>
@@ -292,41 +265,42 @@ new class extends Component {
                  class="absolute rounded-2xl bg-white/5 border border-white/10 pointer-events-none opacity-0 z-0"></div>
 
             <!-- USER CONTACT (Self Chat) -->
-            @php 
+            <?php 
                 $authUser = auth()->user(); 
                 $activeParticipantIds = array_map('strval', $this->selectedConversation?->participant_ids ?? []);
                 $isSelfSelected = $this->selectedConversationId && 
                     $this->selectedConversation?->type === 'direct' && 
                     count($activeParticipantIds) === 1 &&
                     in_array((string) $authUser->_id, $activeParticipantIds);
-            @endphp
-            <button wire:click="selectConversation(null, '{{ $authUser->_id }}')"
+            ?>
+            <button wire:click="selectConversation(null, '<?php echo e($authUser->_id); ?>')"
                 @mouseenter="window.SanCoMotion?.animateHoverPill($refs.hoverPill, $el)"
                 class="relative w-full flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-200 z-10 
-                {{ $isSelfSelected 
+                <?php echo e($isSelfSelected 
                     ? 'bg-[#27272a] border border-pink-500/40 shadow-lg shadow-pink-500/10 ring-1 ring-pink-500/30' 
-                    : 'border border-transparent' }}">
+                    : 'border border-transparent'); ?>">
                 
-                @if ($isSelfSelected)
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isSelfSelected): ?>
                     <div class="absolute left-0 top-3 bottom-3 w-1 bg-pink-500 rounded-r-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
-                @endif
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                 <!-- Avatar -->
                 <div class="relative flex-shrink-0">
-                    <img src="{{ $authUser->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($authUser->name) }}"
+                    <img src="<?php echo e($authUser->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($authUser->name)); ?>"
                         referrerpolicy="no-referrer"
-                        class="w-11 h-11 rounded-full object-cover border {{ $isSelfSelected ? 'border-pink-500/40 shadow-sm' : 'border-white/10' }} transition-all">
+                        class="w-11 h-11 rounded-full object-cover border <?php echo e($isSelfSelected ? 'border-pink-500/40 shadow-sm' : 'border-white/10'); ?> transition-all">
                     <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#18181b]"></div>
                 </div>
 
                 <!-- Info -->
                 <div class="flex-1 min-w-0 text-left">
                     <div class="flex items-center gap-2">
-                        <h3 class="text-[13px] font-semibold {{ $isSelfSelected ? 'text-pink-400 font-bold' : 'text-white' }} truncate">{{ $authUser->name }}</h3>
+                        <h3 class="text-[13px] font-semibold <?php echo e($isSelfSelected ? 'text-pink-400 font-bold' : 'text-white'); ?> truncate"><?php echo e($authUser->name); ?></h3>
                         <span class="px-1.5 py-0.5 text-[9px] font-bold bg-pink-500/20 text-pink-400 rounded-md uppercase tracking-wider">You</span>
                     </div>
-                    <p class="text-[11px] {{ $isSelfSelected ? 'text-pink-400/70' : 'text-[#71717a]' }} font-mono truncate">
-                        {{ $authUser->user_tag ?? 'No Tag' }}
+                    <p class="text-[11px] <?php echo e($isSelfSelected ? 'text-pink-400/70' : 'text-[#71717a]'); ?> font-mono truncate">
+                        <?php echo e($authUser->user_tag ?? 'No Tag'); ?>
+
                     </p>
                 </div>
             </button>
@@ -336,37 +310,37 @@ new class extends Component {
                 <div class="flex items-center justify-between">
                     <h2 class="text-[10px] font-bold text-[#71717a] uppercase tracking-widest">
                         Contacts
-                        <span class="ml-1 text-pink-500/60">({{ $this->contacts->count() }})</span>
+                        <span class="ml-1 text-pink-500/60">(<?php echo e($this->contacts->count()); ?>)</span>
                     </h2>
                     <div class="h-px flex-1 bg-[#2a2a2d] ml-3"></div>
                 </div>
             </div>
 
             <!-- CONTACT LIST -->
-            @forelse ($this->contacts as $contact)
-                @php
+            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $this->contacts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $contact): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                <?php
                     $isSelected = $this->selectedConversationId && 
                         in_array((string) $contact->_id, $activeParticipantIds) &&
                         !($this->selectedConversation?->type === 'direct' && count($activeParticipantIds) === 1);
-                @endphp
-                <button wire:click="selectConversation(null, '{{ $contact->_id }}')"
-                    wire:key="contact-{{ $contact->_id }}"
+                ?>
+                <button wire:click="selectConversation(null, '<?php echo e($contact->_id); ?>')"
+                    <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'contact-'.e($contact->_id).''; ?>wire:key="contact-<?php echo e($contact->_id); ?>"
                     @mouseenter="window.SanCoMotion?.animateHoverPill($refs.hoverPill, $el)"
                     class="relative w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 group z-10 
-                            {{ $isSelected
+                            <?php echo e($isSelected
                                 ? 'bg-[#27272a] border border-pink-500/40 shadow-lg shadow-pink-500/10'
-                                : 'border border-transparent' }}">
+                                : 'border border-transparent'); ?>">
 
-                    @if ($isSelected)
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isSelected): ?>
                         <div class="absolute left-0 top-3 bottom-3 w-1 bg-pink-500 rounded-r-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
-                    @endif
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
-                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.has('{{ $contact->_id }}') }"
-                        @presence-updated.window="isOnline = window.onlineUsers.has('{{ $contact->_id }}')">
+                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.has('<?php echo e($contact->_id); ?>') }"
+                        @presence-updated.window="isOnline = window.onlineUsers.has('<?php echo e($contact->_id); ?>')">
 
-                        <img src="{{ $contact->avatar ?? 'https://ui-avatars.com/api/?size=100&background=3f3f46&color=fff&name=' . urlencode($contact->name) }}"
+                        <img src="<?php echo e($contact->avatar ?? 'https://ui-avatars.com/api/?size=100&background=3f3f46&color=fff&name=' . urlencode($contact->name)); ?>"
                             referrerpolicy="no-referrer"
-                            class="w-11 h-11 rounded-full object-cover border {{ $isSelected ? 'border-pink-500/40 shadow-sm shadow-pink-500/20' : 'border-white/10 group-hover:border-white/20' }} transition-all">
+                            class="w-11 h-11 rounded-full object-cover border <?php echo e($isSelected ? 'border-pink-500/40 shadow-sm shadow-pink-500/20' : 'border-white/10 group-hover:border-white/20'); ?> transition-all">
 
                         <div :class="isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-[#52525b]'"
                             class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#18181b] transition-all duration-500">
@@ -376,29 +350,31 @@ new class extends Component {
                     <div class="flex-1 min-w-0 text-left">
                         <div class="flex items-center justify-between">
                             <h3
-                                class="text-[13px] font-semibold {{ $isSelected ? 'text-pink-400 font-bold' : 'text-white group-hover:text-pink-50' }} transition-colors truncate">
-                                {{ $contact->name }}
+                                class="text-[13px] font-semibold <?php echo e($isSelected ? 'text-pink-400 font-bold' : 'text-white group-hover:text-pink-50'); ?> transition-colors truncate">
+                                <?php echo e($contact->name); ?>
+
                             </h3>
                         </div>
-                        <p class="text-[11px] {{ $isSelected ? 'text-pink-400/70' : 'text-[#71717a]' }} truncate mt-0.5">
-                            {{ $contact->user_tag ?? 'No Tag' }}
+                        <p class="text-[11px] <?php echo e($isSelected ? 'text-pink-400/70' : 'text-[#71717a]'); ?> truncate mt-0.5">
+                            <?php echo e($contact->user_tag ?? 'No Tag'); ?>
+
                         </p>
                     </div>
 
-                    <div class="flex-shrink-0 {{ $isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100' }} transition-opacity">
-                        <svg class="w-4 h-4 {{ $isSelected ? 'text-pink-400' : 'text-[#52525b]' }}" fill="none" stroke="currentColor"
+                    <div class="flex-shrink-0 <?php echo e($isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'); ?> transition-opacity">
+                        <svg class="w-4 h-4 <?php echo e($isSelected ? 'text-pink-400' : 'text-[#52525b]'); ?>" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
                             </path>
                         </svg>
                     </div>
                 </button>
-            @empty
+            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
                 <div class="flex flex-col items-center justify-center py-12 text-center">
                     <p class="text-[13px] font-medium text-[#52525b]">No contacts yet</p>
                 </div>
-            @endforelse
-            {{-- end contacts loop --}}
+            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+            
         </div>
 
         <!-- Resizer Handle -->
@@ -414,18 +390,18 @@ new class extends Component {
     <!-- MAIN CHAT CANVAS -->
     <div class="flex-1 flex flex-col relative bg-[#09090b] z-10 w-full">
 
-        @if ($selected = $this->selectedConversation)
-            @php
+        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selected = $this->selectedConversation): ?>
+            <?php
                 $selInfo = $selected->getDisplayInfo();
                 $isSelf = $selected->type === 'direct' && count($selected->participant_ids ?? []) === 1;
                 $otherUserId = (string) ($selInfo['_id'] ?? ($selInfo['id'] ?? ''));
-            @endphp
+            ?>
 
             <div
                 class="h-16 flex items-center justify-between px-6 py-4 bg-[#1e1e21]/80 backdrop-blur-md border-b border-[#2a2a2d] z-10 sticky top-0">
                 <div class="flex items-center gap-3" x-data="{
                     async syncMyKey() {
-                        const userId = @js((string) auth()->id());
+                        const userId = <?php echo \Illuminate\Support\Js::from((string) auth()->id())->toHtml() ?>;
                         const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
                         if (!mnemonic) {
                             window.notyf.error('No recovery key found. Please generate one in Settings.');
@@ -449,18 +425,18 @@ new class extends Component {
                         </svg>
                     </button>
                     <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 shadow-md">
-                        <img src="{{ $selInfo['avatar'] }}" alt="{{ $selInfo['name'] }}"
+                        <img src="<?php echo e($selInfo['avatar']); ?>" alt="<?php echo e($selInfo['name']); ?>"
                             class="w-full h-full object-cover">
                     </div>
 
-                    <div wire:key="header-presence-{{ $otherUserId }}" x-data="{
-                        isOnline: window.onlineUsers.has('{{ $otherUserId }}')
+                    <div <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'header-presence-'.e($otherUserId).''; ?>wire:key="header-presence-<?php echo e($otherUserId); ?>" x-data="{
+                        isOnline: window.onlineUsers.has('<?php echo e($otherUserId); ?>')
                     }"
-                        @presence-updated.window="isOnline = window.onlineUsers.has('{{ $otherUserId }}')">
+                        @presence-updated.window="isOnline = window.onlineUsers.has('<?php echo e($otherUserId); ?>')">
 
-                        <h2 class="text-white text-[15px] font-bold leading-tight">{{ $selInfo['name'] }}</h2>
+                        <h2 class="text-white text-[15px] font-bold leading-tight"><?php echo e($selInfo['name']); ?></h2>
                         <div class="flex items-center gap-2 mt-0.5">
-                            @php
+                            <?php
                                 $myKey = $selected->participant_public_keys[auth()->id()] ?? null;
                                 $othersMissing = collect($selected->participant_public_keys)
                                     ->forget(auth()->id())
@@ -468,9 +444,9 @@ new class extends Component {
                                 $allKeysSet =
                                     count($selected->participant_public_keys) > 0 &&
                                     !collect($selected->participant_public_keys)->contains(null);
-                            @endphp
+                            ?>
 
-                            @if ($allKeysSet)
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($allKeysSet): ?>
                                 <span
                                     class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -480,7 +456,7 @@ new class extends Component {
                                     </svg>
                                     Encrypted
                                 </span>
-                            @elseif(!$myKey)
+                            <?php elseif(!$myKey): ?>
                                 <button type="button" @click="syncMyKey()"
                                     class="flex items-center gap-1 text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase tracking-wider transition-colors group/sec">
                                     <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor"
@@ -490,7 +466,7 @@ new class extends Component {
                                     </svg>
                                     Update Your Keys
                                 </button>
-                            @else
+                            <?php else: ?>
                                 <span
                                     class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -499,7 +475,7 @@ new class extends Component {
                                     </svg>
                                     Standard (Waiting for keys)
                                 </span>
-                            @endif
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                             <span x-show="isOnline"
                                 class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider"
@@ -511,20 +487,21 @@ new class extends Component {
                         </div>
 
                         <p class="text-[11px] font-medium flex items-center gap-1.5">
-                            @if ($isSelf)
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isSelf): ?>
                                 <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]"></span>
                                 <span class="text-emerald-500">Active (You)</span>
-                            @else
+                            <?php else: ?>
                                 <span :class="isOnline ? 'bg-emerald-500 shadow-[0_0_5px_#10b981]' : 'bg-[#71717a]'"
                                     class="w-1.5 h-1.5 rounded-full transition-all duration-500"></span>
 
                                 <span :class="isOnline ? 'text-emerald-500' : 'text-[#71717a]'"
                                     class="transition-colors duration-500" x-text="isOnline ? 'Online' : 'Offline'">
-                                    {{-- Fallback for first load --}}
-                                    {{ ($selInfo['status'] ?? '') === 'online' ? 'Online' : 'Offline' }}
+                                    
+                                    <?php echo e(($selInfo['status'] ?? '') === 'online' ? 'Online' : 'Offline'); ?>
+
                                 </span>
-                            @endif
-                            {{-- end isSelf check --}}
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            
                         </p>
                     </div>
                 </div>
@@ -536,7 +513,7 @@ new class extends Component {
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                     </button>
-                    @if (!$isSelf && $otherUserId)
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!$isSelf && $otherUserId): ?>
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open"
                                 class="transition hover:text-white focus:outline-none p-1 rounded-lg hover:bg-white/5">
@@ -556,7 +533,7 @@ new class extends Component {
                                 x-transition:leave-end="transform opacity-0 scale-95"
                                 class="absolute right-0 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
                                 style="display: none;">
-                                <button wire:click="toggleMute('{{ $otherUserId }}')" @click="open = false"
+                                <button wire:click="toggleMute('<?php echo e($otherUserId); ?>')" @click="open = false"
                                     class="w-full text-left px-4 py-2.5 text-xs font-semibold text-[#a1a1aa] hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition">
                                     <svg class="w-4 h-4 text-[#71717a]" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor" stroke-width="2">
@@ -567,7 +544,7 @@ new class extends Component {
                                     </svg>
                                     Mute Notifications
                                 </button>
-                                <button wire:click="unfriend('{{ $otherUserId }}')" @click="open = false"
+                                <button wire:click="unfriend('<?php echo e($otherUserId); ?>')" @click="open = false"
                                     class="w-full text-left px-4 py-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-400/10 flex items-center gap-2.5 transition border-t border-white/5">
                                     <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor" stroke-width="2">
@@ -576,7 +553,7 @@ new class extends Component {
                                     </svg>
                                     Remove Friend
                                 </button>
-                                <button wire:click="blockUser('{{ $otherUserId }}')" @click="open = false"
+                                <button wire:click="blockUser('<?php echo e($otherUserId); ?>')" @click="open = false"
                                     class="w-full text-left px-4 py-2.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 flex items-center gap-2.5 transition">
                                     <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor" stroke-width="2">
@@ -587,14 +564,14 @@ new class extends Component {
                                 </button>
                             </div>
                         </div>
-                    @endif
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
             </div>
 
-            <div id="chat-messages-container" wire:key="conversation-{{ $selected->_id }}"
+            <div id="chat-messages-container" <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'conversation-'.e($selected->_id).''; ?>wire:key="conversation-<?php echo e($selected->_id); ?>"
                 class="flex-1 overflow-y-auto py-6 custom-scrollbar bg-transparent flex flex-col text-left"
                 x-data="{
-                    convoId: @js($this->selectedConversationId),
+                    convoId: <?php echo \Illuminate\Support\Js::from($this->selectedConversationId)->toHtml() ?>,
                 
                     init() {
                         // Scroll down immediately when opening the chat
@@ -623,14 +600,14 @@ new class extends Component {
                     }
                 }" @scroll-bottom.window="setTimeout(() => scrollToBottom(), 50)">
 
-                @if ($selected->messages && $selected->messages->count() > 0)
-                    @php
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selected->messages && $selected->messages->count() > 0): ?>
+                    <?php
                         $previousMessage = null;
-                    @endphp
+                    ?>
 
                     <div class="px-6 space-y-2 py-4">
-                    @foreach ($selected->messages as $message)
-                        @php
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = $selected->messages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $message): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                        <?php
                             $isYou = (string) $message->sender_id === (string) auth()->id();
                             $senderAvatar = $isYou
                                 ? auth()->user()->avatar ??
@@ -648,78 +625,79 @@ new class extends Component {
                                     $showHeader = false;
                                 }
                             }
-                        @endphp
+                        ?>
 
-                        <div class="flex items-end gap-2.5 w-full {{ $isYou ? 'justify-end' : 'justify-start' }} message-bubble-anim msg-slide-ease-in {{ $showHeader ? 'mt-3 first:mt-0' : 'mt-1' }}"
+                        <div class="flex items-end gap-2.5 w-full <?php echo e($isYou ? 'justify-end' : 'justify-start'); ?> message-bubble-anim msg-slide-ease-in <?php echo e($showHeader ? 'mt-3 first:mt-0' : 'mt-1'); ?>"
                             x-init="$nextTick(() => window.SanCoMotion?.animateMessageSlideIn($el))"
-                            wire:key="msg-{{ $message->_id }}">
+                            <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'msg-'.e($message->_id).''; ?>wire:key="msg-<?php echo e($message->_id); ?>">
                             
-                            {{-- Receiver Avatar (Only for contact messages) --}}
-                            @if (!$isYou)
-                                @if ($showHeader)
-                                    <img src="{{ $senderAvatar }}"
+                            
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!$isYou): ?>
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showHeader): ?>
+                                    <img src="<?php echo e($senderAvatar); ?>"
                                         class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-white/10 shadow-sm mb-0.5">
-                                @else
+                                <?php else: ?>
                                     <div class="w-8 shrink-0 select-none"></div>
-                                @endif
-                            @endif
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
-                            {{-- Message Bubble containing text + inline timestamp --}}
+                            
                             <div class="group relative max-w-[80%] sm:max-w-[72%]">
                                 <div x-data="{
-                                    decryptedBody: @js($message->body),
+                                    decryptedBody: <?php echo \Illuminate\Support\Js::from($message->body)->toHtml() ?>,
                                     async init() {
                                         this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
-                                            @js($message->body),
-                                            @js($message->metadata),
-                                            @js((string) auth()->id())
+                                            <?php echo \Illuminate\Support\Js::from($message->body)->toHtml() ?>,
+                                            <?php echo \Illuminate\Support\Js::from($message->metadata)->toHtml() ?>,
+                                            <?php echo \Illuminate\Support\Js::from((string) auth()->id())->toHtml() ?>
                                         );
                                     }
                                 }"
-                                    class="px-4 py-2.5 rounded-2xl text-[14.5px] leading-[1.45] break-words transition-all shadow-sm {{ $isYou ? 'bg-purple-600 text-white rounded-br-xs' : 'bg-[#202024] text-[#e4e4e7] border border-white/5 rounded-bl-xs' }}">
-                                    <span x-text="decryptedBody">{{ $message->body }}</span>
+                                    class="px-4 py-2.5 rounded-2xl text-[14.5px] leading-[1.45] break-words transition-all shadow-sm <?php echo e($isYou ? 'bg-purple-600 text-white rounded-br-xs' : 'bg-[#202024] text-[#e4e4e7] border border-white/5 rounded-bl-xs'); ?>">
+                                    <span x-text="decryptedBody"><?php echo e($message->body); ?></span>
                                     <span
                                         x-data="{
                                             formattedTime: '',
                                             init() {
-                                                const d = new Date(@js($message->created_at->toISOString()));
+                                                const d = new Date(<?php echo \Illuminate\Support\Js::from($message->created_at->toISOString())->toHtml() ?>);
                                                 this.formattedTime = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
                                             }
                                         }"
                                         x-text="formattedTime"
-                                        class="inline-block text-[10px] {{ $isYou ? 'text-white/80 font-medium' : 'text-[#71717a]' }} ml-3 mt-1 float-right align-bottom select-none">
-                                        {{ $message->created_at->setTimezone(config('app.timezone', 'Asia/Kuala_Lumpur'))->format('g:i A') }}
+                                        class="inline-block text-[10px] <?php echo e($isYou ? 'text-white/80 font-medium' : 'text-[#71717a]'); ?> ml-3 mt-1 float-right align-bottom select-none">
+                                        <?php echo e($message->created_at->setTimezone(config('app.timezone', 'Asia/Kuala_Lumpur'))->format('g:i A')); ?>
+
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        @php
+                        <?php
                             $previousMessage = $message;
-                        @endphp
-                    @endforeach
+                        ?>
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
                     </div>
-                    {{-- end messages loop --}}
-                @else
+                    
+                <?php else: ?>
                     <div class="flex-1 flex flex-col items-center justify-center text-center px-4">
                         <div class="w-16 h-16 rounded-full overflow-hidden mb-4 shadow-lg border-2 border-white/5">
-                            <img src="{{ $selInfo['avatar'] ?? '' }}" class="w-full h-full object-cover">
+                            <img src="<?php echo e($selInfo['avatar'] ?? ''); ?>" class="w-full h-full object-cover">
                         </div>
-                        <h3 class="text-white text-lg font-bold mb-1">{{ $selInfo['name'] ?? 'User' }}</h3>
+                        <h3 class="text-white text-lg font-bold mb-1"><?php echo e($selInfo['name'] ?? 'User'); ?></h3>
                         <p class="text-[#71717a] text-[13px]">This is the beginning of your direct message history.</p>
                     </div>
-                @endif
-                {{-- end has messages check --}}
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                
 
             </div>
 
             <div class="px-6 py-5 bg-[#1e1e21]/95 backdrop-blur-md border-t border-[#2a2a2d]">
-                @if ($isSelf)
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isSelf): ?>
                     <div class="text-center mb-3">
                         <span class="text-[#71717a] text-[10px] uppercase tracking-[0.2em] font-semibold">Saved
                             Messages</span>
                     </div>
-                @endif
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3"
                     x-data="{
                         maxSize: 10 * 1024 * 1024, // 10MB
@@ -749,7 +727,7 @@ new class extends Component {
                         // regeneration). Caching them in sessionStorage avoids a Livewire round-
                         // trip + MongoDB query on every single message send.
                         // Cache is keyed by conversationId so switching conversations is isolated.
-                        _convId: @js((string) $this->selectedConversationId ?? ''),
+                        _convId: <?php echo \Illuminate\Support\Js::from((string) $this->selectedConversationId ?? '')->toHtml() ?>,
                         _cacheKey() { return 'e2e_keys_' + this._convId; },
                         _readKeyCache() {
                             try {
@@ -766,7 +744,7 @@ new class extends Component {
                         // public keys as part of loading the conversation — that data is available in
                         // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
                         init() {
-                            const renderKeys = @js($selected->participant_public_keys ?? []);
+                            const renderKeys = <?php echo \Illuminate\Support\Js::from($selected->participant_public_keys ?? [])->toHtml() ?>;
                             if (renderKeys && Object.keys(renderKeys).length > 0) {
                                 this._writeKeyCache(renderKeys);
                             }
@@ -777,7 +755,7 @@ new class extends Component {
                             const body = this.localBody;
                             if (!body || !body.trim()) return;
                     
-                            const userId = @js((string) auth()->id());
+                            const userId = <?php echo \Illuminate\Support\Js::from((string) auth()->id())->toHtml() ?>;
                             let privateKey = sessionStorage.getItem('e2e_private_' + userId);
                             let publicKey = sessionStorage.getItem('e2e_public_' + userId);
                     
@@ -818,7 +796,7 @@ new class extends Component {
                                     }
                                 } catch (e) {
                                     console.error('E2E: Failed to fetch participant keys:', e);
-                                    keys = keys || @js($selected->participant_public_keys ?? []);
+                                    keys = keys || <?php echo \Illuminate\Support\Js::from($selected->participant_public_keys ?? [])->toHtml() ?>;
                                 }
                             }
                     
@@ -898,7 +876,7 @@ new class extends Component {
                             </div>
                         </div>
 
-                        <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
+                        <input type="text" x-model="localBody" placeholder="Message <?php echo e($selInfo['name']); ?>..."
                             class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
                             autocomplete="off">
 
@@ -912,12 +890,12 @@ new class extends Component {
                     </fieldset>
                 </form>
             </div>
-            {{-- end isSelf footer check --}}
-        @else
+            
+        <?php else: ?>
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-center space-y-4">
                     <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
-                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto"
+                        <img src="<?php echo e(asset('images/logo/SanCo.png')); ?>" class="w-24 h-24 object-contain mx-auto"
                             alt="SanCo Logo">
                     </div>
                     <div>
@@ -926,8 +904,8 @@ new class extends Component {
                     </div>
                 </div>
             </div>
-        @endif
-        {{-- end selected conversation check --}}
+        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+        
     </div>
 
 
@@ -941,8 +919,8 @@ new class extends Component {
 
         <div class="relative w-full max-w-md bg-[#1e1e21] rounded-3xl overflow-hidden shadow-2xl border border-white/5 p-6 md:p-8"
             x-data="{
-                tag: @js(auth()->user()->user_tag ?? 'Not Set'),
-                link: @js(url('/j/' . (auth()->user()->user_tag ?? 'default'))),
+                tag: <?php echo \Illuminate\Support\Js::from(auth()->user()->user_tag ?? 'Not Set')->toHtml() ?>,
+                link: <?php echo \Illuminate\Support\Js::from(url('/j/' . (auth()->user()->user_tag ?? 'default')))->toHtml() ?>,
                 copied: false,
                 copy(text) {
                     navigator.clipboard.writeText(text);
@@ -1001,20 +979,27 @@ new class extends Component {
                                         </svg>
                                     </button>
                                 </div>
-                                @error('searchUserTag')
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['searchUserTag'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
                                     <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
                                         x-transition:leave="transition ease-in duration-500"
                                         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-                                        <span class="text-red-500 text-[15px] mt-1">{{ $message }}</span>
+                                        <span class="text-red-500 text-[15px] mt-1"><?php echo e($message); ?></span>
                                     </div>
-                                @enderror
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                             </div>
 
-                            @if ($searchResult)
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($searchResult): ?>
                                 <div
                                     class="p-5 bg-[#202024] border border-white/5 rounded-2xl flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-200">
                                     <div class="relative mb-3">
-                                        <img src="{{ $searchResult->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($searchResult->name) }}"
+                                        <img src="<?php echo e($searchResult->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($searchResult->name)); ?>"
                                             referrerpolicy="no-referrer"
                                             class="w-16 h-16 rounded-2xl border border-white/10 object-cover shadow-md">
                                         <div
@@ -1023,11 +1008,13 @@ new class extends Component {
                                     </div>
                                     <div class="mb-4">
                                         <h4 class="text-lg font-bold text-white tracking-tight">
-                                            {{ $searchResult->name }}
+                                            <?php echo e($searchResult->name); ?>
+
                                         </h4>
                                         <p
                                             class="text-[15px] text-pink-500 font-mono tracking-wider uppercase opacity-80">
-                                            {{ $searchResult->user_tag }}
+                                            <?php echo e($searchResult->user_tag); ?>
+
                                         </p>
                                     </div>
                                     <button type="submit"
@@ -1035,7 +1022,7 @@ new class extends Component {
                                         ADD CONTACT
                                     </button>
                                 </div>
-                            @endif
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         </form>
                     </div>
 
@@ -1090,10 +1077,10 @@ new class extends Component {
                 </div>
             </div>
         </div>
-    </div>{{-- end modal outer container --}}
+    </div>
 
-    @include('livewire.messenger.settings-overlay')
-    @include('livewire.messenger.pending-requests-overlay')
+    <?php echo $__env->make('livewire.messenger.settings-overlay', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <?php echo $__env->make('livewire.messenger.pending-requests-overlay', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <style>
         @keyframes msgSlideEaseIn {
@@ -1121,4 +1108,4 @@ new class extends Component {
             border-radius: 4px;
         }
     </style>
-</div>
+</div><?php /**PATH C:\Users\johan\Desktop\Laravel\SanCo\resources\views\livewire/messenger.blade.php ENDPATH**/ ?>

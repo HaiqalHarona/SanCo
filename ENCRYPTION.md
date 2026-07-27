@@ -163,31 +163,51 @@ async encryptMessage(body, recipientPublicKeys, senderPrivateKeyBase64) {
 ### 3.2 Decryption & Key Unwrapping (`resources/js/encrypt.js`)
 When Bob receives the message package from the server:
 
-1. Bob extracts his wrapped key envelope using his user ID: `metadata.enc_keys[Bob's ID]`.
-2. Bob opens the sealed box using his Curve25519 private key to recover the symmetric `msgKey`.
-3. Bob decrypts the ciphertext using the recovered `msgKey` and the message's `nonce`.
+1. Bob checks `sessionStorage` for his private key. If missing (e.g. fresh tab or cleared session), the client automatically re-derives his keypair from `localStorage` (`e2e_recovery_{userId}`).
+2. Bob extracts his wrapped key envelope using his user ID: `metadata.enc_keys[Bob's ID]` (with fallback string ID matching to handle MongoDB ObjectId serialization).
+3. Bob opens the sealed box using his Curve25519 private key to recover the symmetric `msgKey`.
+4. Bob decrypts the ciphertext using the recovered `msgKey` and the message's `nonce`.
 
 ```javascript
-async decryptMessage(encBodyBase64, nonceBase64, encKeyForMeBase64, myPublicKeyBase64, myPrivateKeyBase64) {
-    await this.init();
-    try {
-        const myPublicKey = this.sodium.from_base64(myPublicKeyBase64);
-        const myPrivateKey = this.sodium.from_base64(myPrivateKeyBase64);
-        const encKeyForMe = this.sodium.from_base64(encKeyForMeBase64);
-        
-        // Unseal the message-specific symmetric key
-        const msgKey = this.sodium.crypto_box_seal_open(encKeyForMe, myPublicKey, myPrivateKey);
-        
-        // Decrypt the ciphertext with the recovered symmetric key
-        const encBody = this.sodium.from_base64(encBodyBase64);
-        const nonce = this.sodium.from_base64(nonceBase64);
-        const decryptedBody = this.sodium.crypto_secretbox_open_easy(encBody, nonce, msgKey);
-        
-        return this.sodium.to_string(decryptedBody);
-    } catch (e) {
-        console.error("Decryption failed", e);
-        return "[Decryption Failed]";
+async decryptMessageForMe(encBody, metadata, userId) {
+    if (!metadata || !metadata.is_encrypted) return encBody;
+
+    const uid = (typeof userId === 'object' && userId !== null && userId.$oid) 
+        ? userId.$oid 
+        : String(userId);
+
+    let privateKey = sessionStorage.getItem('e2e_private_' + uid);
+    let publicKey = sessionStorage.getItem('e2e_public_' + uid);
+
+    // Auto-recover keypair from localStorage if sessionStorage is empty
+    if (!privateKey || !publicKey) {
+        const mnemonic = localStorage.getItem('e2e_recovery_' + uid);
+        if (mnemonic) {
+            const keyPair = await this.deriveKeyPair(mnemonic);
+            sessionStorage.setItem('e2e_private_' + uid, keyPair.privateKey);
+            sessionStorage.setItem('e2e_public_' + uid, keyPair.publicKey);
+            privateKey = keyPair.privateKey;
+            publicKey = keyPair.publicKey;
+        }
     }
+
+    // Robust key lookup in enc_keys (handle String vs ObjectId keys)
+    let encKeyForMe = metadata.enc_keys?.[uid];
+    if (!encKeyForMe && metadata.enc_keys) {
+        for (const [k, v] of Object.entries(metadata.enc_keys)) {
+            if (String(k) === String(uid)) {
+                encKeyForMe = v;
+                break;
+            }
+        }
+    }
+
+    const nonce = metadata.nonce;
+    if (!privateKey || !publicKey || !encKeyForMe || !nonce) {
+        return "[Encrypted Message - Key Missing]";
+    }
+
+    return await this.decryptMessage(encBody, nonce, encKeyForMe, publicKey, privateKey);
 }
 ```
 

@@ -109,9 +109,36 @@ class EncryptionService {
             ? userId.$oid 
             : String(userId);
 
-        const privateKey = sessionStorage.getItem('e2e_private_' + uid);
-        const publicKey = sessionStorage.getItem('e2e_public_' + uid);
-        const encKeyForMe = metadata.enc_keys?.[uid];
+        let privateKey = sessionStorage.getItem('e2e_private_' + uid);
+        let publicKey = sessionStorage.getItem('e2e_public_' + uid);
+
+        // Auto-recover keypair from localStorage if sessionStorage is empty
+        if (!privateKey || !publicKey) {
+            const mnemonic = localStorage.getItem('e2e_recovery_' + uid);
+            if (mnemonic) {
+                try {
+                    const keyPair = await this.deriveKeyPair(mnemonic);
+                    sessionStorage.setItem('e2e_private_' + uid, keyPair.privateKey);
+                    sessionStorage.setItem('e2e_public_' + uid, keyPair.publicKey);
+                    privateKey = keyPair.privateKey;
+                    publicKey = keyPair.publicKey;
+                } catch (e) {
+                    console.error('E2E: Auto key recovery failed during decryption:', e);
+                }
+            }
+        }
+
+        // Robust key lookup in enc_keys (handle String vs ObjectId keys)
+        let encKeyForMe = metadata.enc_keys?.[uid];
+        if (!encKeyForMe && metadata.enc_keys) {
+            for (const [k, v] of Object.entries(metadata.enc_keys)) {
+                if (String(k) === String(uid)) {
+                    encKeyForMe = v;
+                    break;
+                }
+            }
+        }
+
         const nonce = metadata.nonce;
 
         if (!privateKey || !publicKey || !encKeyForMe || !nonce) {

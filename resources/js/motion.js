@@ -79,8 +79,27 @@ export const animateOAuthUnlock = (selector = '.oauth-btn') => {
     });
 };
 
+export const animateMessageSlideIn = (target) => {
+    if (!target) return;
+    const els = typeof target === 'string' ? document.querySelectorAll(target) : (target instanceof NodeList || Array.isArray(target) ? Array.from(target) : [target]);
+    if (!els.length) return;
+
+    els.forEach(el => {
+        if (!el || el.dataset.animatedMsg) return;
+        el.dataset.animatedMsg = 'true';
+
+        animate(el, {
+            opacity: [0, 1],
+            translateY: [24, 0],
+            scale: [0.96, 1],
+            duration: 450,
+            ease: 'outCubic'
+        });
+    });
+};
+
 export const animateModalEntry = (modalCardSelector) => {
-    const card = document.querySelector(modalCardSelector);
+    const card = typeof modalCardSelector === 'string' ? document.querySelector(modalCardSelector) : modalCardSelector;
     if (!card) return;
 
     animate(card, {
@@ -88,6 +107,38 @@ export const animateModalEntry = (modalCardSelector) => {
         scale: [0.9, 1],
         translateY: [20, 0],
         duration: 450,
+        ease: 'outQuad'
+    });
+};
+
+export const animateHoverPill = (pillEl, targetEl) => {
+    if (!pillEl || !targetEl) return;
+    const targetRect = targetEl.getBoundingClientRect();
+    const container = pillEl.parentElement;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+
+    const top = targetRect.top - containerRect.top + container.scrollTop;
+    const height = targetRect.height;
+    const width = targetRect.width;
+    const left = targetRect.left - containerRect.left;
+
+    animate(pillEl, {
+        top: top,
+        height: height,
+        left: left,
+        width: width,
+        opacity: 1,
+        duration: 300,
+        ease: 'outCubic'
+    });
+};
+
+export const hideHoverPill = (pillEl) => {
+    if (!pillEl) return;
+    animate(pillEl, {
+        opacity: 0,
+        duration: 220,
         ease: 'outQuad'
     });
 };
@@ -101,7 +152,10 @@ window.SanCoMotion = {
     initMagneticButtons,
     animateClick,
     animateMessageCascade,
+    animateMessageSlideIn,
     animateHeroChips,
     animateOAuthUnlock,
-    animateModalEntry
+    animateModalEntry,
+    animateHoverPill,
+    hideHoverPill
 };
