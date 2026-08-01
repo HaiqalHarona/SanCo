@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "brand": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/brand/SKILL.md",
+      "computedHash": "bd65dbd8de679805d1ad740c74a41b4f831d08ff0240390a7ed2947c62a896b9"
+    },
+    "laravel-best-practices": {
+      "source": "laravel/boost",
+      "sourceType": "github",
+      "skillPath": ".ai/laravel/skill/laravel-best-practices/SKILL.md",
+      "computedHash": "06fcb378b32925a9bd9a5e8b099811fa72183c390db09b63a66624575bdbfddd"
+    },
+    "livewire-development": {
+      "source": "laravel/boost",
+      "sourceType": "github",
+      "skillPath": "tests/Fixtures/vendor-skills/livewire-development/SKILL.md",
+      "computedHash": "1aa270613f86f776a4aa042623051841e10ce926bf3afa9401d530f97613c285"
+    },
+    "pennant-development": {
+      "source": "laravel/boost",
+      "sourceType": "github",
+      "skillPath": ".ai/pennant/skill/pennant-development/SKILL.md",
+      "computedHash": "ae02f00f5aecb79a1fdda8d0c41373d504738827bdbfff463edb87f5f95419a1"
+    },
+    "tailwindcss-development": {
+      "source": "laravel/boost",
+      "sourceType": "github",
+      "skillPath": ".ai/tailwindcss/3/skill/tailwindcss-development/SKILL.md",
+      "computedHash": "9f8d2d6571d0f1890fed1771ce0a58b87368098d0703c8e546a79ce20893df9b"
+    },
+    "test-skill": {
+      "source": "laravel/boost",
+      "sourceType": "github",
+      "skillPath": "tests/Fixtures/skills/test-skill/SKILL.md",
+      "computedHash": "70cbbb13622b8bcc9f588840caebec2ba66776423920c0e8cd2b8148b76c339a"
+    },
+    "ui-styling": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-styling/SKILL.md",
+      "computedHash": "e10b225db04fdfd893fdda2b9ed893c315f9dee5693494743d57b02066e96a51"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "ce0af583006d2fd4731663adc50c0a5df1121f0d49a5bb9c308eca4ee295c60a"
+    }
+  }
+}

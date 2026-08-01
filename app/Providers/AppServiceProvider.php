@@ -7,6 +7,9 @@ use App\Services\FriendshipService;
 use App\Services\ConversationService;
 use App\Services\MessageService;
 use App\Models\PersonalAccessToken;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Sanctum\Sanctum;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,5 +32,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        // Rate limiter for OAuth login endpoints — 5 attempts per minute per IP
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        // Rate limiter for authenticated API endpoints — 60 requests per minute per user (fallback to IP)
+        RateLimiter::for('api', function (Request $request) {
+            return $request->user()
+                ? Limit::perMinute(60)->by($request->user()->_id)
+                : Limit::perMinute(60)->by($request->ip());
+        });
     }
 }

@@ -28,7 +28,8 @@ class DetectConcurrentLogins
             // instead of fetching the user row from MongoDB on every request.
             $storedSessionId = $this->userService->getSession($userId);
 
-            if ($storedSessionId && $storedSessionId !== $currentSessionId) {
+            // Constant-time comparison to prevent timing oracle attacks on session tokens
+            if ($storedSessionId && ! hash_equals($storedSessionId, $currentSessionId)) {
                 $location = $user->last_login_location ?? 'Unknown';
                 $browser  = $user->last_login_browser  ?? 'Unknown Browser';
                 $avatar   = $user->avatar;

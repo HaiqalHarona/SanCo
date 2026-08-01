@@ -22,7 +22,7 @@ if (config('app.allow_dev_login')) {
     });
 }
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     
     // AUTH & USER PROFILE
 
