@@ -166,14 +166,20 @@ new class extends Component {
         class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
 
         <div class="space-y-5 flex-1 flex flex-col items-center">
-            <div class="mb-2 w-full flex justify-center items-center px-0">
-                <div class="p-2.5 text-pink-500 flex items-center justify-center">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                    </svg>
-                </div>
-            </div>
+            <!-- Contact List Toggle Button -->
+            <button @click="toggleSidebar()"
+                :class="!isSidebarCollapsed ? 'text-pink-500 bg-pink-500/10' : 'text-[#71717a] hover:text-white hover:bg-white/5'"
+                class="p-3 rounded-xl transition relative group" title="Toggle Contacts List">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
+                    </path>
+                </svg>
+                <span
+                    class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    <span x-text="isSidebarCollapsed ? 'Open Contacts' : 'Close Contacts'"></span>
+                </span>
+            </button>
 
             <button @click="showRequests = true" :class="showRequests ? 'text-white bg-white/5' : 'text-[#71717a] hover:text-white hover:bg-white/5'"
                 class="p-3 rounded-xl transition relative group" title="Friend Requests">
@@ -914,7 +920,14 @@ new class extends Component {
             </div>
             {{-- end isSelf footer check --}}
         @else
-            <div class="flex-1 flex items-center justify-center">
+            <div class="flex-1 flex items-center justify-center relative">
+                <button x-show="isSidebarCollapsed" @click="toggleSidebar()"
+                    class="absolute top-4 left-4 p-2.5 rounded-xl bg-[#1e1e21] border border-white/10 text-[#a1a1aa] hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 text-xs font-semibold shadow-lg">
+                    <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <span>Open Contacts List</span>
+                </button>
                 <div class="text-center space-y-4">
                     <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
                         <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto"

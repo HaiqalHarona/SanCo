@@ -14,15 +14,16 @@ class FriendshipService
 
     public function getFriends(string $userId): Collection
     {
-        return Cache::remember("sanco:user:{$userId}:friends", now()->addHours(12), function () use ($userId) {
+        $userIdStr = (string) $userId;
+        return Cache::remember("sanco:user:{$userIdStr}:friends", now()->addHours(12), function () use ($userIdStr) {
             $friendships = Friendship::where('status', 'accepted')
-                ->where(function ($q) use ($userId) {
-                    $q->where('user_id', $userId)->orWhere('friend_id', $userId);
+                ->where(function ($q) use ($userIdStr) {
+                    $q->where('user_id', $userIdStr)->orWhere('friend_id', $userIdStr);
                 })
                 ->get();
 
-            $friendIds = $friendships->map(function ($f) use ($userId) {
-                return (string) $f->user_id === (string) $userId
+            $friendIds = $friendships->map(function ($f) use ($userIdStr) {
+                return (string) $f->user_id === $userIdStr
                     ? (string) $f->friend_id
                     : (string) $f->user_id;
             })->unique()->values();
