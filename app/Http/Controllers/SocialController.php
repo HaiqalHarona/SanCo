@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\UserService;
 use FurqanSiddiqui\BIP39\BIP39;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -12,31 +13,38 @@ use Laravel\Socialite\Facades\Socialite;
 
 class SocialController extends Controller
 {
+    public function __construct(private UserService $userService) {}
 
-    public function redirectProvider($provider)
+    public function redirectProvider(Request $request, $provider)
     {
-        // Force account selection for both Google and GitHub to prevent auto-login
-        if ($provider === 'google' || $provider === 'github') {
-            return Socialite::driver($provider)
-                ->with(['prompt' => 'select_account'])
-                ->redirect();
+        if ($request->has('mobile')) {
+            session(['is_mobile' => true]);
+        } else {
+            session()->forget('is_mobile');
         }
 
-        return Socialite::driver($provider)->redirect();
+        $driver = Socialite::driver($provider)->stateless();
+
+        // Force account selection for both Google and GitHub to prevent auto-login
+        if ($provider === 'google' || $provider === 'github') {
+            return $driver->with(['prompt' => 'select_account'])->redirect();
+        }
+
+        return $driver->redirect();
     }
 
     public function callbackRequest($provider)
     {
         try {
-            $user = Socialite::driver($provider)->user();
+            $user = Socialite::driver($provider)->stateless()->user();
         } catch (\Exception $e) {
-            return redirect()->route('auth')->with('error', 'Login with '.ucfirst($provider).' failed. Please try again later.');
+            logger()->error('Socialite authentication error: ' . $e->getMessage(), ['exception' => $e]);
+            return redirect()->route('auth')->with('error', 'Login with '.ucfirst($provider).' failed: '.$e->getMessage());
         }
 
         $appUser = null;
 
         try {
-            $masterKey = implode(' ', BIP39::Generate(24)->words);
 
             if ($provider == 'google') {
                 $email = $user->getEmail();
@@ -55,7 +63,6 @@ class SocialController extends Controller
                         'name' => $user->getName(),
                         'avatar' => $user->getAvatar(),
                         'user_tag' => $this->generateUniqueTag('SanCo'),
-                        'master_key' => bcrypt($masterKey),
                     ]
                 );
             } elseif ($provider == 'github') {
@@ -70,7 +77,6 @@ class SocialController extends Controller
                         'email' => $user->getEmail(),
                         'avatar' => $user->getAvatar(),
                         'user_tag' => $this->generateUniqueTag('SanCo'),
-                        'master_key' => bcrypt($masterKey),
                     ]
                 );
             }
@@ -82,34 +88,57 @@ class SocialController extends Controller
                 $location = 'Unknown';
 
                 try {
-                    // Attempt to resolve IP to a physical location
-                    $response = file_get_contents("http://ip-api.com/json/{$ip}?fields=status,message,country,city");
-                    if ($response) {
-                        $data = json_decode($response, true);
-                        if ($data && $data['status'] === 'success') {
-                            $location = "{$data['city']}, {$data['country']}";
+                    // Only query location for public IPs, and set a short timeout to prevent login blocking
+                    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                        $context = stream_context_create([
+                            'http' => [
+                                'timeout' => 1.0, // 1 second timeout limit
+                            ]
+                        ]);
+                        $response = @file_get_contents("http://ip-api.com/json/{$ip}?fields=status,message,country,city", false, $context);
+                        if ($response) {
+                            $data = json_decode($response, true);
+                            if ($data && $data['status'] === 'success') {
+                                $location = "{$data['city']}, {$data['country']}";
+                            }
                         }
                     }
                 } catch (\Exception $e) {
                     // Fail silently for location fetch to avoid blocking login
                 }
 
+                if (session('is_mobile')) {
+                    session()->forget('is_mobile');
+
+                    // Store login metadata in MongoDB (infrequent, non-hot-path)
+                    $appUser->update([
+                        'last_login_ip'       => $ip,
+                        'last_login_browser'  => $browser,
+                        'last_login_location' => $location,
+                    ]);
+
+                    $token = $appUser->createToken('mobile-auth-token')->plainTextToken;
+                    $redirectUrl = 'sanco://auth/callback?token=' . urlencode($token);
+                    return redirect($redirectUrl);
+                }
+
                 // Perform login and regenerate session ID to prevent fixation attacks
                 Auth::login($appUser);
                 session()->regenerate();
 
-                // Store the NEW session ID in the database to track concurrent logins
+                // Store session ID in Redis (replaces MongoDB current_session_id write)
+                $this->userService->setSession((string) $appUser->_id, session()->getId());
+
+                // Store login metadata in MongoDB (infrequent, non-hot-path)
                 $appUser->update([
-                    'current_session_id' => session()->getId(),
-                    'last_login_ip' => $ip,
-                    'last_login_browser' => $browser,
+                    'last_login_ip'       => $ip,
+                    'last_login_browser'  => $browser,
                     'last_login_location' => $location,
                 ]);
 
                 if ($appUser->wasRecentlyCreated) {
                     return redirect()->route('messenger')
-                        ->with('new_master_key', $masterKey)
-                        ->with('success', 'Welcome! Your account has been created and secured.');
+                        ->with('success', 'Welcome! Your account has been created.');
                 }
                 return redirect()->route('messenger')->with('success', 'Welcome '. $appUser->name);
             }
@@ -139,11 +168,13 @@ class SocialController extends Controller
 
     public function logout(Request $request)
     {
-        // Get the current user ID before logout to clear specific session keys if needed
-        $userId = Auth::id();
-        
+        $userId = (string) Auth::id();
+
+        // Clear Redis session key so concurrent login detection is reset
+        $this->userService->forgetSession($userId);
+
         Auth::logout();
-        
+
         // Invalidate the session and regenerate the token to prevent session fixation
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -152,7 +183,7 @@ class SocialController extends Controller
         $request->session()->forget([
             'new_master_key',
             'e2e_private_' . $userId,
-            'e2e_public_' . $userId
+            'e2e_public_' . $userId,
         ]);
 
         return redirect()->route('auth')->with('success', 'Logged out successfully');

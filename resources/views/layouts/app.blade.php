@@ -51,6 +51,9 @@
     <!-- Load Tailwind via Vite -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
+    <!-- Material Symbols Outlined -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=sunny" />
+
     <!-- Livewire Styles -->
     @livewireStyles
 </head>

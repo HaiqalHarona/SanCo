@@ -18,9 +18,12 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
 /vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
 .aider*
 .clineignore
+artifact/

@@ -1,299 +1,100 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\FriendshipController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use App\Models\User;
-use App\Models\Conversation;
-use App\Models\Message;
-use App\Models\Friendship;
-use App\Events\MessageSent;
-use App\Events\IncomingRequest;
-use App\Events\LoadContactList;
-use FurqanSiddiqui\BIP39\BIP39;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
-// Public Authentication Routes
-Route::post('/login', function (Request $request) {
-    $validator = Validator::make($request->all(), [
-        'user_tag' => 'required|string',
-        'recovery_key' => 'required|string',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['errors' => $validator->errors()], 422);
-    }
-
-    $user = User::where('user_tag', $request->user_tag)->first();
-
-    if (!$user || !Hash::check($request->recovery_key, $user->master_key)) {
-        return response()->json(['message' => 'Invalid User Tag ID or Recovery Key.'], 401);
-    }
-
-    // Capture metadata for monitoring
-    $ip = $request->ip();
-    $browser = $request->header('User-Agent');
-    $location = 'Unknown';
-
-    try {
-        $response = file_get_contents("http://ip-api.com/json/{$ip}?fields=status,message,country,city");
-        if ($response) {
-            $data = json_decode($response, true);
-            if ($data && $data['status'] === 'success') {
-                $location = "{$data['city']}, {$data['country']}";
-            }
-        }
-    } catch (\Exception $e) {
-        // Fail silently
-    }
-
-    // Issue Sanctum Token
-    $token = $user->createToken('api-token')->plainTextToken;
-
-    // Update login status and location tracking
-    $user->update([
-        'current_session_id' => 'api_' . Str::random(20),
-        'last_login_ip' => $ip,
-        'last_login_browser' => $browser,
-        'last_login_location' => $location,
-    ]);
-
-    return response()->json([
-        'user' => $user,
-        'token' => $token,
-    ]);
-});
-
-Route::post('/register', function (Request $request) {
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:255',
-        'avatar' => 'nullable|string', // base64 encoded image
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['errors' => $validator->errors()], 422);
-    }
-
-    // Generate E2E Recovery key (24 words mnemonic)
-    $masterKey = implode(' ', BIP39::Generate(24)->words);
-
-    // Unique user tag generation
-    $userTag = 'SanCo_' . Str::lower(Str::random(10));
-    while (User::where('user_tag', $userTag)->exists()) {
-        $userTag = 'SanCo_' . Str::lower(Str::random(10));
-    }
-
-    $avatarUrl = null;
-    if ($request->avatar) {
-        if (preg_match('/^data:image\/(\w+);base64,/', $request->avatar, $type)) {
-            $data = substr($request->avatar, strpos($request->avatar, ',') + 1);
-            $type = strtolower($type[1]);
-            if (in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-                $data = base64_decode($data);
-                if ($data !== false) {
-                    if (!Storage::disk('public')->exists('avatars')) {
-                        Storage::disk('public')->makeDirectory('avatars');
-                    }
-                    $filename = Str::random(40) . '.' . $type;
-                    Storage::disk('public')->put('avatars/' . $filename, $data);
-                    $avatarUrl = asset('storage/avatars/' . $filename);
-                }
-            }
-        }
-    }
-
-    $user = User::create([
-        'name' => $request->name,
-        'avatar' => $avatarUrl ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode($request->name),
-        'user_tag' => $userTag,
-        'master_key' => bcrypt($masterKey),
-    ]);
-
-    $token = $user->createToken('api-token')->plainTextToken;
-
-    return response()->json([
-        'user' => $user,
-        'recovery_key' => $masterKey,
-        'token' => $token,
-    ], 201);
-});
-
-// Authenticated Routes (Protected by Laravel Sanctum)
-Route::middleware('auth:sanctum')->group(function () {
-    
-    // User Profile Actions
-    Route::get('/user', function (Request $request) {
-        return response()->json($request->user());
-    });
-
-    Route::post('/user/public-key', function (Request $request) {
-        $request->validate(['public_key' => 'required|string']);
-        $request->user()->update(['public_key' => $request->public_key]);
-        return response()->json(['success' => true, 'public_key' => $request->public_key]);
-    });
-
-    // Contacts / Friends
-    Route::get('/contacts', function (Request $request) {
-        $auth_id = $request->user()->_id;
-        $friendships = Friendship::where('status', 'accepted')
-            ->where(function ($query) use ($auth_id) {
-                $query->where('user_id', $auth_id)->orWhere('friend_id', $auth_id);
-            })
-            ->get();
-
-        $friendsIds = $friendships->map(function ($f) use ($auth_id) {
-            return (string) $f->user_id === (string) $auth_id ? (string) $f->friend_id : (string) $f->user_id;
-        })->unique()->toArray();
-
-        $contacts = User::whereIn('_id', $friendsIds)->get();
-        return response()->json($contacts);
-    });
-
-    Route::post('/contacts/search', function (Request $request) {
-        $request->validate(['user_tag' => 'required|string']);
-        
-        $user = User::where('user_tag', $request->user_tag)
-            ->where('_id', '!=', $request->user()->_id)
-            ->first();
-
-        if (!$user) {
-            return response()->json(['message' => 'No user found with that tag.'], 404);
-        }
-
-        return response()->json($user);
-    });
-
-    Route::post('/contacts/request', function (Request $request) {
-        $request->validate(['friend_id' => 'required|string']);
-        
-        $receiver = User::find($request->friend_id);
-        if (!$receiver) {
-            return response()->json(['message' => 'User not found.'], 404);
-        }
-
-        try {
-            $friendship = Friendship::sendRequest($request->user()->_id, $receiver->_id);
-            broadcast(new IncomingRequest($receiver->_id, $request->user()->name))->toOthers();
-            return response()->json(['success' => true, 'friendship' => $friendship]);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
-        }
-    });
-
-    Route::get('/contacts/pending', function (Request $request) {
-        $userId = $request->user()->_id;
-        $incoming = Friendship::getPendingRequests($userId);
-        $sent = Friendship::getSentRequests($userId);
-        
+if (config('app.allow_dev_login')) {
+    Route::post('/dev-login/{id}', function ($id) {
+        $user = \App\Models\User::findOrFail($id);
+        $token = $user->createToken('api-test-token')->plainTextToken;
         return response()->json([
-            'incoming' => $incoming,
-            'sent' => $sent
-        ]);
-    });
-
-    Route::post('/contacts/accept', function (Request $request) {
-        $request->validate(['sender_id' => 'required|string']);
-        
-        try {
-            Friendship::acceptRequest($request->user()->_id, $request->sender_id);
-            broadcast(new LoadContactList($request->sender_id, $request->user()->_id))->toOthers();
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
-        }
-    });
-
-    Route::post('/contacts/reject', function (Request $request) {
-        $request->validate(['sender_id' => 'required|string']);
-        
-        try {
-            Friendship::rejectRequest($request->user()->_id, $request->sender_id);
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
-        }
-    });
-
-    // Conversations / Inbox
-    Route::get('/conversations', function (Request $request) {
-        $inbox = Conversation::getInboxFor($request->user());
-        return response()->json($inbox);
-    });
-
-    Route::post('/conversations', function (Request $request) {
-        $request->validate(['participant_id' => 'required|string']);
-        
-        try {
-            $convo = Conversation::findOrCreateDirect($request->user()->_id, $request->participant_id);
-            return response()->json($convo);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
-        }
-    });
-
-    Route::get('/conversations/{id}/messages', function (Request $request, $id) {
-        $convo = Conversation::find($id);
-        if (!$convo || !$convo->hasParticipant($request->user()->_id)) {
-            return response()->json(['message' => 'Conversation not found or unauthorized.'], 403);
-        }
-
-        $limit = $request->query('limit', 20);
-        $messages = Message::getMessages($id, $limit);
-        return response()->json($messages);
-    });
-
-    Route::post('/conversations/{id}/messages', function (Request $request, $id) {
-        $convo = Conversation::find($id);
-        if (!$convo || !$convo->hasParticipant($request->user()->_id)) {
-            return response()->json(['message' => 'Conversation not found or unauthorized.'], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'body' => 'required|string',
-            'type' => 'nullable|string|in:text,image,file,audio,video',
-            'nonce' => 'nullable|string',
-            'enc_keys' => 'nullable|array',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $isEncrypted = !empty($request->enc_keys);
-
-        $message = Message::sendMessage([
-            'conversation_id' => $id,
-            'sender_id' => $request->user()->_id,
-            'body' => $request->body,
-            'type' => $request->type ?? 'text',
-            'metadata' => [
-                'nonce' => $request->nonce,
-                'enc_keys' => $request->enc_keys,
-                'is_encrypted' => $isEncrypted
+            'success' => true,
+            'token' => $token,
+            'user' => [
+                'id' => (string) $user->_id,
+                'name' => $user->name,
+                'email' => $user->email,
             ]
         ]);
-
-        broadcast(new MessageSent($message))->toOthers();
-
-        return response()->json($message, 201);
     });
+}
 
-    // Token Revocation
-    Route::post('/logout', function (Request $request) {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['success' => true, 'message' => 'Token revoked successfully.']);
-    });
+Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+    
+    // AUTH & USER PROFILE
+
+    // Retrieves details of the currently authenticated user (ID, name, email, avatar, E2EE public key)
+    Route::get('/user', [AuthController::class, 'me'])->name('api.user');
+
+    // Updates authenticated user's profile information (name and base64 encoded avatar image)
+    Route::put('/user/profile', [AuthController::class, 'updateProfile'])->name('api.user.profile');
+
+    // Registers/updates the user's end-to-end encryption (E2EE) RSA/ECC public key in database
+    Route::post('/user/keys/sync', [AuthController::class, 'syncPublicKey'])->name('api.user.keys.sync');
+
+
+    // CONVERSATIONS & CHANNELS
+
+    // Gets lists of active direct or group conversations for the user, with display names and last message summary
+    Route::get('/conversations', [ConversationController::class, 'index'])->name('api.conversations.index');
+
+    // Resolves a direct conversation with another user or creates a new group chat
+    Route::post('/conversations', [ConversationController::class, 'store'])->name('api.conversations.store');
+
+    // Fetches detailed metadata of a specific conversation, including participant profiles and E2EE keys
+    Route::get('/conversations/{id}', [ConversationController::class, 'show'])->name('api.conversations.show');
+
+    // Adds a participant to an existing group conversation (restricted to current conversation members only)
+    Route::post('/conversations/{id}/participants', [ConversationController::class, 'addParticipant'])->name('api.conversations.participants.add');
+
+    // Removes a participant from a group conversation (restricted to current conversation members only)
+    Route::delete('/conversations/{id}/participants/{userId}', [ConversationController::class, 'removeParticipant'])->name('api.conversations.participants.remove');
+
+
+    // MESSAGES & CHAT ACTIONS
+
+    // Retrieves paginated list of E2EE encrypted messages in a conversation (supports ?page and ?limit query params)
+    Route::get('/conversations/{id}/messages', [MessageController::class, 'index'])->name('api.messages.index');
+
+    // Stores and sends a new message to a conversation. Enforces E2EE payload validation metadata structure
+    Route::post('/conversations/{id}/messages', [MessageController::class, 'store'])->name('api.messages.store');
+
+    // Updates a message's read state by adding the current user's ID to the read receipts array
+    Route::post('/messages/{id}/read', [MessageController::class, 'read'])->name('api.messages.read');
+
+    // Adds an emoji reaction to a specific message
+    Route::post('/messages/{id}/reactions', [MessageController::class, 'react'])->name('api.messages.react');
+
+    // Removes the authenticated user's reaction from a message
+    Route::delete('/messages/{id}/reactions', [MessageController::class, 'unreact'])->name('api.messages.unreact');
+
+
+    // FRIENDSHIPS & RELATIONSHIPS
+
+    // Retrieves the authenticated user's current accepted friends list
+    Route::get('/friends', [FriendshipController::class, 'index'])->name('api.friends.index');
+
+    // Retrieves incoming pending friend requests waiting for approval
+    Route::get('/friends/requests/pending', [FriendshipController::class, 'pendingRequests'])->name('api.friends.requests.pending');
+
+    // Sends a new pending friend request to another user
+    Route::post('/friends/requests', [FriendshipController::class, 'sendRequest'])->name('api.friends.requests.send');
+
+    // Accepts a pending incoming friend request, establishing a reciprocal friendship link
+    Route::put('/friends/requests/{senderId}/accept', [FriendshipController::class, 'acceptRequest'])->name('api.friends.requests.accept');
+
+    // Rejects/deletes an incoming pending friend request
+    Route::delete('/friends/requests/{senderId}/reject', [FriendshipController::class, 'rejectRequest'])->name('api.friends.requests.reject');
+
+    // Removes an accepted friend relationship, deleting both reciprocal records
+    Route::delete('/friends/{friendId}', [FriendshipController::class, 'unfriend'])->name('api.friends.unfriend');
+
+    // Blocks a user (blocks incoming requests, deletes active friendships, and stops direct communication)
+    Route::post('/friends/{friendId}/block', [FriendshipController::class, 'block'])->name('api.friends.block');
+
+    // Unblocks a user, restoring the ability to initiate contacts or send friend requests
+    Route::delete('/friends/{friendId}/unblock', [FriendshipController::class, 'unblock'])->name('api.friends.unblock');
 });

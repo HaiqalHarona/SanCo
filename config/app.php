@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Kuala_Lumpur'),
 
     /*
     |--------------------------------------------------------------------------
@@ -104,6 +104,8 @@ return [
             explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
         ),
     ],
+
+    'allow_dev_login' => (bool) env('ALLOW_DEV_LOGIN', false),
 
     /*
     |--------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
  * Friendship document — stored in the 'friendships' collection.
@@ -19,6 +20,8 @@ use MongoDB\Laravel\Eloquent\Model;
  */
 class Friendship extends Model
 {
+    use HasFactory;
+
     protected $connection = 'mongodb';
     protected $collection = 'friendships';
 

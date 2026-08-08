@@ -6,40 +6,36 @@ layout('layouts.auth');
 
 ?>
 
-<div class="min-h-screen lg:h-screen lg:overflow-hidden bg-transparent flex items-center justify-center p-4 font-sans">
+<div x-data="{ 
+        mouseX: 0, 
+        mouseY: 0,
+        handleMouseMove(e) {
+            const rect = $el.getBoundingClientRect();
+            this.mouseX = e.clientX - rect.left;
+            this.mouseY = e.clientY - rect.top;
+        }
+     }" 
+     @mousemove="handleMouseMove($event)"
+     class="relative min-h-screen lg:h-screen lg:overflow-hidden bg-[#18181b] flex items-center justify-center p-4 font-sans overflow-hidden select-none">
+
+    {{-- Interactive Cursor Radial Spotlight Background --}}
+    <div class="pointer-events-none absolute inset-0 transition-opacity duration-500 opacity-70 z-0"
+         :style="`background: radial-gradient(800px circle at ${mouseX}px ${mouseY}px, rgba(236,72,153,0.15), transparent 80%);`"></div>
+
+    {{-- Ambient Light Blob Orbs --}}
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-pink-600/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0" style="animation-delay: 1.5s;"></div>
 
     {{-- CARD WRAPPER --}}
-    <div class="relative w-full max-w-7xl min-h-[500px] rounded-3xl overflow-hidden shadow-2xl shadow-black/60 flex flex-col md:flex-row border border-white/[0.06]">
+    <div class="relative w-full max-w-7xl min-h-[500px] rounded-3xl overflow-hidden shadow-2xl shadow-black/60 flex flex-col md:flex-row border border-white/[0.06] z-10">
 
-        {{-- LEFT PANEL (slideshow) --}}
-        <div class="relative hidden md:block md:w-[55%] lg:w-[60%] xl:w-[65%] flex-shrink-0 overflow-hidden bg-[#18181b]"
-            x-data="{
-                slide: 0,
-                slides: 3,
-                nextSlide() {
-                    this.slide = (this.slide + 1) % this.slides;
-                    let delay = this.slide === 0 ? 6000 : 3500;
-                    setTimeout(() => this.nextSlide(), delay);
-                },
-                init() {
-                    setTimeout(() => this.nextSlide(), 6000);
-                }
-            }"
-        >
+        {{-- LEFT PANEL --}}
+        <div class="relative hidden md:block md:w-[55%] lg:w-[60%] xl:w-[65%] flex-shrink-0 overflow-hidden bg-[#18181b]">
             {{-- Spacer image forcing natural aspect-ratio height natively --}}
             <img src="{{ asset('images/auth/firstslide.png') }}" class="w-full h-auto max-h-[350px] md:max-h-[450px] lg:max-h-[600px] xl:max-h-[720px] object-cover invisible block" alt="">
 
-            {{-- Slide 0: Welcome Text & Gradients --}}
-            <div x-show="slide === 0" 
-                 x-transition:enter="transition-opacity ease-out duration-[1500ms]" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="transition-opacity ease-in duration-[1500ms]" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 class="absolute inset-0 w-full h-full z-10"
-                 style="display: none;"
-                 x-init="$el.style.display = 'block'">
+            {{-- First Picture Content --}}
+            <div class="absolute inset-0 w-full h-full z-10">
                  
                 {{-- Background Image & Contrast Overlay --}}
                 <div class="absolute inset-0 bg-[#18181b]">
@@ -50,20 +46,15 @@ layout('layouts.auth');
                     style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E'); background-size: 180px 180px;">
                 </div>
 
-                {{-- Sliding panel content --}}
-                <div class="relative z-10 flex flex-col justify-between h-full p-8 md:p-10">
-                    {{-- Logo --}}
-                    <div class="flex items-center gap-3">
-                
-                    </div>
-
+                {{-- Panel content --}}
+                <div class="relative z-10 flex flex-col justify-end h-full p-8 md:p-10">
                     {{-- Center content --}}
                     <div class="space-y-5">
                         <div class="space-y-3">
                             <h2 class="text-white text-3xl md:text-4xl font-bold leading-tight tracking-tight">
                                 Welcome to<br>SanCo.
                             </h2>
-                            <p class="text-white/50 text-sm leading-relaxed max-w-[220px]">
+                            <p class="text-white/50 text-sm leading-relaxed max-w-[260px]">
                                 Sign in to continue your conversations and stay connected across all devices.
                             </p>
                         </div>
@@ -75,49 +66,17 @@ layout('layouts.auth');
                     </div>
                 </div>
             </div>
-
-            {{-- Slide 1: Image 1 --}}
-            <div x-show="slide === 1" 
-                 x-transition:enter="transition-opacity ease-out duration-[1500ms]" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="transition-opacity ease-in duration-[1500ms]" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 style="display: none;"
-                 class="absolute inset-0 w-full h-full bg-[#18181b] z-10">
-                <img src="{{ asset('images/auth/2nd.png') }}" class="w-full h-full object-cover" alt="Auth image 1">
-            </div>
-
-            {{-- Slide 2: Image 2 --}}
-            <div x-show="slide === 2" 
-                 x-transition:enter="transition-opacity ease-out duration-[1500ms]" 
-                 x-transition:enter-start="opacity-0" 
-                 x-transition:enter-end="opacity-100" 
-                 x-transition:leave="transition-opacity ease-in duration-[1500ms]" 
-                 x-transition:leave-start="opacity-100" 
-                 x-transition:leave-end="opacity-0" 
-                 style="display: none;"
-                 class="absolute inset-0 w-full h-full bg-[#18181b] z-10">
-                <img src="{{ asset('images/auth/3rd.png') }}" class="w-full h-full object-cover lg:object-[50%_42%] xl:object-[50%_40%]" alt="Auth image 2">
-            </div>
-
-
         </div>
 
         {{-- RIGHT PANEL (form) --}}
-        <div class="flex-1 bg-[#202024] flex flex-col justify-center px-8 md:px-12 py-10 relative overflow-hidden">
+        <div class="flex-1 bg-[#202024] flex flex-col justify-between px-8 md:px-12 py-10 relative overflow-hidden">
 
             {{-- Subtle top border glow --}}
             <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-px bg-gradient-to-r from-transparent via-pink-500/40 to-transparent"></div>
 
-            {{-- ---- FORM AREA ---- --}}
-            <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
-
-                {{-- Logo Placeholder --}}
-                <div class="flex justify-center -mb-14">
-                    <img src="{{ asset('images/logo/SanCo.png') }}" class="h-72 w-auto object-contain -my-14" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
-                </div>
+            <div class="w-full my-auto">
+                {{-- ---- FORM AREA ---- --}}
+                <div x-data="{ agreed: false }" class="relative w-full max-w-sm mx-auto text-center">
 
                 {{-- Heading --}}
                 <div class="mb-10">
@@ -154,6 +113,33 @@ layout('layouts.auth');
                         Continue with GitHub
                     </a>
                 </div>
+
+                @if (config('app.allow_dev_login'))
+                    <div class="mt-8 p-4 bg-white/5 rounded-2xl border border-white/10 text-left">
+                        <h3 class="text-white text-xs font-bold uppercase tracking-wider mb-2 text-white/60">Developer Quick Login</h3>
+                        <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                            @php $devUsers = \App\Models\User::limit(6)->get(); @endphp
+                            @if ($devUsers->isEmpty())
+                                <p class="text-white/40 text-xs italic">No users seeded yet. Run php artisan db:seed</p>
+                            @else
+                                @foreach ($devUsers as $devUser)
+                                    <a href="{{ route('auth.dev-login', $devUser->id) }}" class="block w-full text-left px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-white/80 text-xs transition-all truncate hover:translate-x-1 duration-200">
+                                        <span class="font-bold text-white">{{ $devUser->name }}</span>
+                                        <span class="block text-[10px] text-white/40">{{ $devUser->email ?? 'No email' }}</span>
+                                    </a>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                </div>
+            </div>
+
+            {{-- Footer Copyright --}}
+            <div class="text-xs text-white/40 font-medium text-center pt-4">
+                &copy; {{ date('Y') }} SanCo. Created by <a href="https://github.com/HaiqalHarona" target="_blank" rel="noopener noreferrer" class="text-white/70 hover:text-pink-400 font-semibold transition-colors underline underline-offset-2">HaiqalHarona</a>
+            </div>
 
             </div>
         </div>

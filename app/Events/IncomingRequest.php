@@ -36,4 +36,9 @@ class IncomingRequest implements ShouldBroadcastNow
             new PrivateChannel('user.' . $this->recieverId),
         ];
     }
+
+    public function broadcastAs(): string
+    {
+        return 'IncomingRequest';
+    }
 }

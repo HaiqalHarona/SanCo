@@ -37,4 +37,9 @@ class LoadContactList implements ShouldBroadcastNow
             new PrivateChannel('user.' . $this->senderId),
         ];
     }
+
+    public function broadcastAs(): string
+    {
+        return 'LoadContactList';
+    }
 }

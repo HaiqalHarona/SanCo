@@ -3,13 +3,30 @@
 namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
-
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Message extends Model
 {
+    use HasFactory;
 
     protected $connection = 'mongodb';
     protected $collection = 'messages';
+
+    protected static function booted()
+    {
+        static::saving(function (Message $message) {
+            if ($message->type !== 'system') {
+                $metadata = $message->metadata ?? [];
+                $isEncrypted = $metadata['is_encrypted'] ?? false;
+                $nonce = $metadata['nonce'] ?? null;
+                $encKeys = $metadata['enc_keys'] ?? null;
+
+                if (!$isEncrypted || empty($nonce) || empty($encKeys)) {
+                    throw new \InvalidArgumentException('Message body must be end-to-end encrypted (E2EE). Plaintext is rejected.');
+                }
+            }
+        });
+    }
 
     protected $fillable = [
         'conversation_id',
@@ -25,11 +42,8 @@ class Message extends Model
     ];
 
     protected $casts = [
-        'read_by'     => 'array',
-        'reactions'   => 'array',
         'is_edited'   => 'boolean',
         'edited_at'   => 'datetime',
-        'metadata'    => 'array',
     ];
 
     protected $with = ['sender'];

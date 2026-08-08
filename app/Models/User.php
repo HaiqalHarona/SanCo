@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
@@ -16,6 +15,20 @@ class User extends MongoUser
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($model) {
+            if (is_null($model->google_id)) {
+                unset($model->google_id);
+            }
+            if (is_null($model->github_id)) {
+                unset($model->github_id);
+            }
+        });
+    }
 
     /**
      * The attributes that are mass assignable.

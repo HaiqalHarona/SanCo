@@ -6,7 +6,10 @@
     <div class="absolute inset-0 transition-colors duration-300"
         :class="$store.theme.current === 'dark' ? 'bg-black/40' : 'bg-gray-900/20'" @click="showRequests = false"></div>
 
-    <div class="relative w-full max-w-6xl rounded-3xl overflow-hidden shadow-2xl border flex flex-col h-[85vh] max-h-[800px] transition-colors duration-300"
+    <div class="relative w-full max-w-6xl rounded-3xl overflow-hidden shadow-2xl border flex flex-col h-[85vh] max-h-[800px] transition-all duration-300 transform"
+        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3"
+        x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3"
         :class="$store.theme.current === 'dark' ? 'bg-[#1e1e21] border-white/5' : 'bg-white border-gray-200'">
 
         <div class="px-8 py-6 border-b sticky top-0 z-20 backdrop-blur-md transition-colors duration-300"

@@ -6,10 +6,11 @@ use MongoDB\Laravel\Eloquent\Model;
 use App\Models\User;
 use App\Models\Message;
 use Illuminate\Support\Facades\Auth;
-
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Conversation extends Model
 {
+    use HasFactory;
 
     protected $connection = 'mongodb';
     protected $collection = 'conversations';

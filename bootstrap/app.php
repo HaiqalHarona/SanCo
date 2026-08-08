@@ -26,4 +26,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, \Illuminate\Http\Request $request) {
             return redirect()->route('auth')->with('error', 'Your session has expired. Please log in again.');
         });
+
+        // Route ALL 4xx HTTP errors to a generic "Page Not Found" page.
+        // This prevents users from distinguishing 403 (Forbidden) from 404 (Not Found),
+        // which leaks information about whether a resource exists or is access-restricted.
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+            $status = $e->getStatusCode();
+
+            if ($status >= 400 && $status < 500) {
+                // API requests get a consistent JSON 404 instead of a redirect
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Not found.'], 404);
+                }
+
+                return redirect()->route('error.not-found');
+            }
+        });
     })->create();

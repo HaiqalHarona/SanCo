@@ -1,23 +1,19 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\Conversation;
-use App\Models\Friendship;
-use App\Models\User;
-use App\Models\Message;
-use Livewire\Attributes\Computed;
-use App\Events\MessageSent;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use FurqanSiddiqui\BIP39\BIP39;
-use App\Events\IncomingRequest;
-use App\Events\LoadContactList;
+use Livewire\Attributes\Url;
+use App\Livewire\MessengerVolt\PendingRequests;
+use App\Livewire\MessengerVolt\FriendActions;
+use App\Livewire\MessengerVolt\SettingsActions;
+use App\Livewire\MessengerVolt\MessagingActions;
 
 new class extends Component {
-    /**
-     * @var string $selectedConversationId
-     * @var int $loadLimit
-     */
+    use PendingRequests;
+    use FriendActions;
+    use SettingsActions;
+    use MessagingActions;
+
+    #[Url(as: 'c')]
     public $selectedConversationId = null;
     public $loadLimit = 20;
 
@@ -25,53 +21,6 @@ new class extends Component {
     {
         return 'layouts.app';
     }
-
-    /**
-     * @file messenger/pending-requests-overlay.blade.php functions
-     */
-
-    #[Computed]
-    public function incomingRequest()
-    {
-        return Friendship::getPendingRequests(auth()->id());
-    }
-
-    #[Computed]
-    public function sentRequest()
-    {
-        return Friendship::getSentRequests(auth()->id());
-    }
-
-    public function acceptRequest(string $senderId)
-    {
-        try {
-            Friendship::acceptRequest(auth()->id(), $senderId);
-            session()->flash('success', 'Friend request accepted');
-            dispatch('request-accepted');
-            $this->reloadContacts($senderId);
-        } catch (\Exception $e) {
-            session()->flash('error', $e->getMessage());
-        }
-    }
-
-    public function rejectRequest(string $senderId)
-    {
-        try {
-            Friendship::rejectRequest(auth()->id(), $senderId);
-        } catch (\Exception $e) {
-            session()->flash('error', $e->getMessage());
-        }
-    }
-
-    /**
-     *
-     */
-
-    /**
-     * @file messenger/settings-overlay.blade.php functions
-     */
-    public string $profileName = '';
-    public $profileAvatar = null; // Will hold base64 string
 
     public function mount()
     {
@@ -82,230 +31,6 @@ new class extends Component {
             $this->searchContact();
             $this->dispatch('open-add-friend-modal');
         }
-    }
-
-    public function updateProfile()
-    {
-        $this->validate([
-            'profileName' => 'required|string|max:255',
-        ]);
-
-        $user = User::find(auth()->id());
-        $user->name = $this->profileName;
-
-        if ($this->profileAvatar) {
-            // Check if it's a base64 image
-            if (preg_match('/^data:image\/(\w+);base64,/', $this->profileAvatar, $type)) {
-                $data = substr($this->profileAvatar, strpos($this->profileAvatar, ',') + 1);
-                $type = strtolower($type[1]); // jpg, png, gif
-
-                if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-                    throw new \Exception('invalid image type');
-                }
-                $data = base64_decode($data);
-
-                if ($data === false) {
-                    throw new \Exception('base64_decode failed');
-                }
-
-                // Ensure storage directory exists
-                if (!Storage::disk('public')->exists('avatars')) {
-                    Storage::disk('public')->makeDirectory('avatars');
-                }
-
-                $filename = Str::random(40) . '.' . $type;
-                Storage::disk('public')->put('avatars/' . $filename, $data);
-
-                $user->avatar = asset('storage/avatars/' . $filename);
-            }
-        }
-
-        $user->save();
-        $this->profileAvatar = null; // Clear out base64 string to free memory
-        $this->dispatch('profile-updated');
-    }
-
-    public function generateNewKey()
-    {
-        $masterKey = implode(' ', BIP39::Generate(24)->words);
-
-        $user = User::find(auth()->id());
-        $user->master_key = bcrypt($masterKey);
-        $user->save();
-
-        return $masterKey;
-    }
-
-    /**
-     *
-     */
-
-    public function selectConversation($id, $userId = null)
-    {
-        if (!$id && $userId) {
-            $convo = Conversation::findOrCreateDirect(auth()->id(), $userId);
-            $this->selectedConversationId = $convo->_id;
-        } else {
-            $this->selectedConversationId = $id;
-        }
-
-        $this->dispatch('scroll-bottom');
-    }
-
-    #[Computed]
-    public function selectedConversation()
-    {
-        if (!$this->selectedConversationId) {
-            return null;
-        }
-
-        $convo = Conversation::find($this->selectedConversationId);
-
-        $messages = Message::getMessages($convo->_id, $this->loadLimit);
-
-        $convo->setRelation('messages', $messages->getCollection()->reverse());
-
-        // Load participant public keys with string IDs to match JS auth()->id()
-        // We use fresh User queries to ensure we get the latest public_key from the database
-        $participants = User::whereIn('_id', $convo->participant_ids)->get(['_id', 'public_key']);
-        $convo->participant_public_keys = $participants->mapWithKeys(function ($user) {
-            return [(string) $user->_id => $user->public_key];
-        })->toArray();
-
-        return $convo;
-    }
-
-    #[Computed]
-    public function preloadChatList()
-    {
-        return Conversation::getInboxFor(auth()->user());
-    }
-
-    /**
-     * Get all accepted friends for the contact sidebar
-     */
-    #[Computed]
-    public function contacts()
-    {
-        $auth_id = auth()->id();
-
-        // Get Contacts either or in user_id or friend_id column
-        $friendships = Friendship::where('status', 'accepted')
-            ->where(function ($query) use ($auth_id) {
-                $query->where('user_id', $auth_id)->orWhere('friend_id', $auth_id);
-            })
-            ->get();
-
-        // Map friendships and get id of the other user in the conversation (friend_id)
-        $friendsIds = $friendships
-            ->map(function ($f) use ($auth_id) {
-                return (string) $f->user_id === (string) $auth_id ? (string) $f->friend_id : (string) $f->user_id;
-            })
-            ->unique();
-
-        return User::whereIn('_id', $friendsIds)->get();
-    }
-    /**
-     * @var string $searchUserTag
-     * var User $searchResult
-     */
-    public $searchUserTag = '';
-    public $searchResult = null;
-
-    public function searchContact()
-    {
-        $this->reset(['searchResult']);
-        $this->searchResult = User::where('user_tag', $this->searchUserTag)
-            ->where('_id', '!=', auth()->id())
-            ->first();
-
-        if (!$this->searchResult) {
-            $this->addError('searchUserTag', 'No user found with that tag. | Cannot search your own user.');
-        }
-    }
-
-    public function addFriend()
-    {
-        $this->validate([
-            'searchUserTag' => 'required|min:16|max:16',
-        ]);
-
-        $authUserTag = auth()->user()->user_tag ?? 'No Tag Set';
-        if ($authUserTag === 'No Tag Set') {
-            $this->addError('searchUserTag', 'Error in creating account contact support');
-            return;
-        }
-
-        try {
-            Friendship::sendRequest(auth()->id(), $this->searchResult->_id);
-            broadcast(new IncomingRequest($this->searchResult->_id, auth()->user()->name))->toOthers(); // Send Event to the reciever
-            session()->flash('success', 'Friend request sent to ' . $this->searchResult->name);
-            $this->dispatch('friend-request-sent');
-            $this->reset(['searchUserTag', 'searchResult']);
-        } catch (Exception $e) {
-            $this->addError('searchUserTag', $e->getMessage());
-            session()->flash('error', 'Error in sending friend request');
-        }
-    }
-
-    /**
-     * @var string $messageBody
-     * String for user message content
-     */
-    public $messageBody = '';
-
-    public function messageUser($encryptedBody = null, $nonce = null, $encryptedKeys = null)
-    {
-        if (!$this->selectedConversationId) {
-            return;
-        }
-
-        $body = $encryptedBody ?? $this->messageBody;
-        if (trim($body) === '') {
-            return;
-        }
-
-        $message = Message::sendMessage([
-            'conversation_id' => $this->selectedConversationId,
-            'sender_id' => auth()->id(),
-            'body' => $body,
-            'type' => 'text',
-            'metadata' => [
-                'nonce' => $nonce,
-                'enc_keys' => $encryptedKeys,
-                'is_encrypted' => !!$encryptedKeys
-            ]
-        ]);
-
-        // Clear Input Box
-        $this->reset('messageBody');
-
-        // Fire websocket event and only sends to the other user and not back
-        broadcast(new MessageSent($message))->toOthers();
-
-        $this->dispatch('scroll-bottom');
-    }
-
-    public function reloadContacts($notifyUser)
-    {
-        unset($this->contacts);
-        unset($this->preloadChatList);
-
-        if ($notifyUser) {
-            broadcast(new LoadContactList($notifyUser, auth()->id()))->toOthers();
-        }
-    }
-
-    public function savePublicKey(string $publicKey)
-    {
-        $user = User::find(auth()->id());
-        $user->update(['public_key' => $publicKey]);
-        
-        // Force re-evaluation of computed properties
-        unset($this->selectedConversation);
-        
-        // Refresh component state
-        $this->dispatch('$refresh');
     }
 };
 
@@ -318,41 +43,146 @@ new class extends Component {
         showRequests: false,
         showAddFriend: false,
         addFriendTab: 'id',
+        isUnlocked: false,
+        hasMasterKey: @js((bool) auth()->user()->master_key),
+        sidebarWidth: parseInt(localStorage.getItem('messenger_sidebar_width')) || 380,
+        isSidebarCollapsed: localStorage.getItem('messenger_sidebar_collapsed') === 'true',
+        isResizing: false,
+
+        toggleSidebar() {
+            this.isSidebarCollapsed = !this.isSidebarCollapsed;
+            localStorage.setItem('messenger_sidebar_collapsed', this.isSidebarCollapsed);
+        },
+
+        startResizing(e) {
+            this.isResizing = true;
+            const startX = e.clientX;
+            const startWidth = this.sidebarWidth;
+            
+            const onMouseMove = (moveEvent) => {
+                if (!this.isResizing) return;
+                const newWidth = Math.max(260, Math.min(650, startWidth + (moveEvent.clientX - startX)));
+                this.sidebarWidth = newWidth;
+                localStorage.setItem('messenger_sidebar_width', newWidth);
+            };
+            
+            const onMouseUp = () => {
+                this.isResizing = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+            };
+            
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        },
     
         init() {
             let userId = @js((string) auth()->id());
-            window.Echo.private('user.' + userId).listen('IncomingRequest', (e) => {
+            this.isUnlocked = !!sessionStorage.getItem('e2e_recovery_' + userId);
     
-                $wire.$refresh();
-            }).listen('LoadContactList', (e) => {
-                $wire.reloadContacts();
+            window.addEventListener('e2e-unlocked', () => {
+                this.isUnlocked = true;
+                this.hasMasterKey = true;
             });
+
+            if (!this.hasMasterKey && !this.isUnlocked) {
+                this.$nextTick(() => {
+                    window.dispatchEvent(new Event('open-security-tab'));
+                });
+            }
+    
+            let refreshTimer = null;
+            const debouncedRefresh = (scroll = false) => {
+                if (refreshTimer) return;
+                refreshTimer = setTimeout(() => {
+                    refreshTimer = null;
+                    $wire.$refresh().then(() => {
+                        if (scroll) {
+                            window.dispatchEvent(new CustomEvent('scroll-bottom'));
+                        }
+                    });
+                }, 40);
+            };
+
+            window.Echo.private('user.' + userId)
+                .listen('IncomingRequest', () => $wire.$refresh())
+                .listen('.IncomingRequest', () => $wire.$refresh())
+                .listen('LoadContactList', () => $wire.reloadContacts())
+                .listen('.LoadContactList', () => $wire.reloadContacts())
+                .listen('MessageSent', (e) => {
+                    const activeConvo = @js((string) $this->selectedConversationId);
+                    if (e && e.conversationId && String(e.conversationId) === String(activeConvo)) {
+                        debouncedRefresh(true);
+                    } else {
+                        $wire.reloadContacts();
+                    }
+                })
+                .listen('.MessageSent', (e) => {
+                    const activeConvo = @js((string) $this->selectedConversationId);
+                    if (e && e.conversationId && String(e.conversationId) === String(activeConvo)) {
+                        debouncedRefresh(true);
+                    } else {
+                        $wire.reloadContacts();
+                    }
+                });
         }
     }" x-on:friend-request-sent.window="showAddFriend = false"
     x-on:open-add-friend-modal.window="showAddFriend = true">
 
-    <!-- NAVIGATION RAIL -->
-    <div class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
-
-        <div class="space-y-6 flex-1 flex flex-col items-center">
-            <div class="mb-4 w-full flex justify-center items-center px-0">
-                <img src="{{ asset('images/logo/SanCo.png') }}" class="w-full h-auto object-contain" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 2px rgba(255, 0, 127, 0.9));">
+    <div x-show="!isUnlocked" style="display:none;"
+        class="absolute inset-0 z-[50] flex flex-col items-center justify-center bg-gray-50/90 dark:bg-black/90 backdrop-blur-sm">
+        <div
+            class="text-center p-8 bg-white dark:bg-[#1e1e21] rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 max-w-md">
+            <div class="w-16 h-16 bg-pink-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                    </path>
+                </svg>
             </div>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                x-text="hasMasterKey ? 'Unlock Messages' : 'Security Setup Required'"></h2>
+            <p class="text-gray-500 dark:text-[#a1a1aa] mb-6"
+                x-text="hasMasterKey ? 'You must enter your Sync Password to unlock this session.' : 'You must set up your End-to-End Encryption key before you can send messages or add friends.'">
+            </p>
+            <button
+                @click="
+                    if (hasMasterKey) {
+                        window.dispatchEvent(new Event('open-security-tab'));
+                    } else {
+                        showSettings = true;
+                        activeTab = 'security';
+                        $nextTick(() => window.dispatchEvent(new Event('open-security-tab')));
+                    }
+                "
+                class="px-6 py-3 w-full bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl transition shadow-[0_0_15px_rgba(236,72,153,0.3)]">
+                <span x-text="hasMasterKey ? 'Enter Password' : 'Setup Security Now'"></span>
+            </button>
+        </div>
+    </div>
 
-            <button @click="activeTab = 'chats'; showSettings = false"
-                :class="activeTab === 'chats' ? 'text-white' : 'text-[#71717a]'"
-                class="p-3 rounded-xl transition relative group">
+    <!-- NAVIGATION RAIL -->
+    <div
+        class="w-[68px] flex-shrink-0 flex flex-col items-center py-6 bg-[#1e1e21] border-r border-[#2a2a2d] z-30 flex">
+
+        <div class="space-y-5 flex-1 flex flex-col items-center">
+            <!-- Contact List Toggle Button -->
+            <button @click="toggleSidebar()"
+                :class="!isSidebarCollapsed ? 'text-pink-500 bg-pink-500/10' : 'text-[#71717a] hover:text-white hover:bg-white/5'"
+                class="p-3 rounded-xl transition relative group" title="Toggle Contacts List">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
                     </path>
                 </svg>
                 <span
-                    class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Chats</span>
+                    class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    <span x-text="isSidebarCollapsed ? 'Open Contacts' : 'Close Contacts'"></span>
+                </span>
             </button>
-            <button @click="showRequests = true" :class="showRequests ? 'text-white' : 'text-[#71717a]'"
-                class="p-3 rounded-xl transition relative group">
 
+            <button @click="showRequests = true" :class="showRequests ? 'text-white bg-white/5' : 'text-[#71717a] hover:text-white hover:bg-white/5'"
+                class="p-3 rounded-xl transition relative group" title="Friend Requests">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
@@ -366,23 +196,31 @@ new class extends Component {
                     <span
                         class="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-medium text-white">99+</span>
                 @endif
-                {{-- end incoming request count --}}
-
                 <span
                     class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
                     Requests
                 </span>
             </button>
+
+            <button class="p-3 text-[#71717a] hover:text-white hover:bg-white/5 rounded-xl transition relative group" title="Create Group">
+                <span class="block w-6 h-6 bg-[#71717a] group-hover:bg-white transition"
+                    style="-webkit-mask-image: url('{{ asset('images/messenger/group.svg') }}'); mask-image: url('{{ asset('images/messenger/group.svg') }}'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
+                <span class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Create Group</span>
+            </button>
+
+            <button @click="showAddFriend = true"
+                class="p-3 text-[#71717a] hover:text-white hover:bg-white/5 rounded-xl transition relative group" title="Add Friend">
+                <span class="block w-6 h-6 bg-[#71717a] group-hover:bg-white transition"
+                    style="-webkit-mask-image: url('{{ asset('images/messenger/person_add.svg') }}'); mask-image: url('{{ asset('images/messenger/person_add.svg') }}'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
+                <span class="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Add Friend</span>
+            </button>
         </div>
 
         <div class="space-y-4 flex flex-col items-center">
             <button @click="$store.theme.toggle()" class="p-3 text-[#71717a] transition group relative">
-                <svg x-show="$store.theme.current === 'dark'" class="w-6 h-6" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 5a7 7 0 100 14 7 7 0 000-14z">
-                    </path>
-                </svg>
+                <span x-show="$store.theme.current === 'dark'"
+                    class="material-symbols-outlined w-6 h-6 flex items-center justify-center"
+                    style="font-size: 24px;">sunny</span>
                 <svg x-show="$store.theme.current === 'light'" class="w-6 h-6" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -429,113 +267,132 @@ new class extends Component {
 
 
     <!-- CONTACT SIDEBAR -->
-    <div
-        class="w-[320px] md:w-[380px] lg:w-[420px] flex-shrink-0 flex flex-col border-r border-[#2a2a2d] bg-[#18181b] z-20">
+    <div class="relative flex-shrink-0 flex flex-col border-r border-[#2a2a2d] bg-[#18181b] z-20 transition-[width,opacity] duration-300 ease-in-out select-none"
+        :class="{ 'transition-none': isResizing }"
+        :style="isSidebarCollapsed ? 'width: 0px; opacity: 0; pointer-events: none; overflow: hidden; border: none;' : 'width: ' + sidebarWidth + 'px; opacity: 1;'">
         <!-- Sidebar Header -->
-        <div class="flex items-center justify-between px-6 py-5 bg-[#1e1e21]">
-            <h1 class="text-xl font-bold text-white">Messages</h1>
-            <div class="flex items-center gap-2">
-                <button class="group p-2 rounded-full transition hover:bg-gray-100 hover:scale-110">
-                    <span class="block w-6 h-6 bg-gray-600 transition group-hover:bg-blue-500"
-                        style="-webkit-mask-image: url('{{ asset('images/messenger/group.svg') }}'); mask-image: url('{{ asset('images/messenger/group.svg') }}'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
-                </button>
-
-                <button @click="showAddFriend = true"
-                    class="group p-2 rounded-full transition hover:bg-gray-100 hover:scale-110">
-                    <span class="block w-6 h-6 bg-gray-600 transition group-hover:bg-blue-500"
-                        style="-webkit-mask-image: url('{{ asset('images/messenger/person_add.svg') }}'); mask-image: url('{{ asset('images/messenger/person_add.svg') }}'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-position: center;"></span>
-                </button>
-            </div>
+        <div class="flex items-center justify-between px-6 py-5 bg-[#1e1e21] shrink-0 border-b border-[#2a2a2d]">
+            <h1 class="text-xl font-bold text-white whitespace-nowrap tracking-wide">Messages</h1>
         </div>
 
         <!-- Search Bar -->
         <div class="px-6 py-4 border-b border-[#2a2a2d]">
             <div
                 class="relative flex items-center w-full h-11 rounded-xl bg-[#202024] px-4 overflow-hidden focus-within:ring-1 focus-within:ring-pink-500/50 transition-all">
-                <svg class="w-5 h-5 text-[#71717a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-[#a1a1aa]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
                 <input type="text" placeholder="Search chats..."
-                    class="w-full bg-transparent border-none focus:ring-0 text-sm text-white placeholder-[#71717a] ml-3 outline-none h-full">
+                    class="w-full bg-transparent border-none focus:ring-0 text-sm text-white placeholder-[#a1a1aa] ml-3 outline-none h-full">
             </div>
         </div>
 
         <!-- USER CONTACT -->
-        @php $authUser = auth()->user(); @endphp
-        <div class="px-4 pt-4 pb-2">
-            <div wire:click="selectConversation(null, '{{ $authUser->_id }}')"
-                class="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 cursor-pointer hover:from-pink-500/15 hover:to-purple-500/15 transition-all duration-200">
+        <!-- CONTACT LIST (Scrollable) -->
+        <div class="relative flex-1 overflow-y-auto custom-scrollbar px-4 pt-2 pb-4 space-y-1"
+             @mouseleave="window.SanCoMotion?.hideHoverPill($refs.hoverPill)">
+
+            <!-- Floating Anime.js Hover Indicator Pill -->
+            <div x-ref="hoverPill"
+                 class="absolute rounded-2xl bg-white/5 border border-white/10 pointer-events-none opacity-0 z-0"></div>
+
+            <!-- USER CONTACT (Self Chat) -->
+            @php 
+                $authUser = auth()->user(); 
+                $activeParticipantIds = array_map('strval', $this->selectedConversation?->participant_ids ?? []);
+                $isSelfSelected = $this->selectedConversationId && 
+                    $this->selectedConversation?->type === 'direct' && 
+                    count($activeParticipantIds) === 1 &&
+                    in_array((string) $authUser->_id, $activeParticipantIds);
+            @endphp
+            <button wire:click="selectConversation(null, '{{ $authUser->_id }}')"
+                @mouseenter="window.SanCoMotion?.animateHoverPill($refs.hoverPill, $el)"
+                class="relative w-full flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-200 z-10 
+                {{ $isSelfSelected 
+                    ? 'bg-[#27272a] border border-pink-500/40 shadow-lg shadow-pink-500/10 ring-1 ring-pink-500/30' 
+                    : 'border border-transparent' }}">
+                
+                @if ($isSelfSelected)
+                    <div class="absolute left-0 top-3 bottom-3 w-1 bg-pink-500 rounded-r-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
+                @endif
+
                 <!-- Avatar -->
                 <div class="relative flex-shrink-0">
                     <img src="{{ $authUser->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($authUser->name) }}"
                         referrerpolicy="no-referrer"
-                        class="w-12 h-12 rounded-full object-cover border-2 border-pink-500/30 shadow-lg shadow-pink-500/10">
-                    <div
-                        class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#18181b]">
-                    </div>
+                        class="w-11 h-11 rounded-full object-cover border {{ $isSelfSelected ? 'border-pink-500/40 shadow-sm' : 'border-white/10' }} transition-all">
+                    <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#18181b]"></div>
                 </div>
+
                 <!-- Info -->
-                <div class="flex-1 min-w-0">
+                <div class="flex-1 min-w-0 text-left">
                     <div class="flex items-center gap-2">
-                        <h3 class="text-sm font-bold text-white truncate">{{ $authUser->name }}</h3>
-                        <span
-                            class="px-1.5 py-0.5 text-[9px] font-bold bg-pink-500/20 text-pink-400 rounded-md uppercase tracking-wider">You</span>
+                        <h3 class="text-[13px] font-semibold {{ $isSelfSelected ? 'text-pink-400 font-bold' : 'text-white' }} truncate">{{ $authUser->name }}</h3>
+                        <span class="px-1.5 py-0.5 text-[9px] font-bold bg-pink-500/20 text-pink-400 rounded-md uppercase tracking-wider">You</span>
                     </div>
-                    <p class="text-[11px] text-pink-400/70 font-mono truncate">
+                    <p class="text-[11px] {{ $isSelfSelected ? 'text-pink-400/70' : 'text-[#71717a]' }} font-mono truncate">
                         {{ $authUser->user_tag ?? 'No Tag' }}
                     </p>
                 </div>
-            </div>
-        </div>
+            </button>
 
-        <!-- CONTACTS SECTION LABEL -->
-        <div class="px-6 pt-4 pb-2">
-            <div class="flex items-center justify-between">
-                <h2 class="text-[10px] font-bold text-[#71717a] uppercase tracking-widest">
-                    Contacts
-                    <span class="ml-1 text-pink-500/60">({{ $this->contacts->count() }})</span>
-                </h2>
-                <div class="h-px flex-1 bg-[#2a2a2d] ml-3"></div>
+            <!-- CONTACTS SECTION LABEL -->
+            <div class="pt-3 pb-1 px-2">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[10px] font-bold text-[#71717a] uppercase tracking-widest">
+                        Contacts
+                        <span class="ml-1 text-pink-500/60">({{ $this->contacts->count() }})</span>
+                    </h2>
+                    <div class="h-px flex-1 bg-[#2a2a2d] ml-3"></div>
+                </div>
             </div>
-        </div>
 
-        <!-- CONTACT LIST (Scrollable) -->
-        <div class="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4 space-y-1">
+            <!-- CONTACT LIST -->
             @forelse ($this->contacts as $contact)
-                <button wire:click="selectConversation(null, '{{ $contact->_id }}' )"
+                @php
+                    $isSelected = $this->selectedConversationId && 
+                        in_array((string) $contact->_id, $activeParticipantIds) &&
+                        !($this->selectedConversation?->type === 'direct' && count($activeParticipantIds) === 1);
+                @endphp
+                <button wire:click="selectConversation(null, '{{ $contact->_id }}')"
                     wire:key="contact-{{ $contact->_id }}"
-                    class="w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 group 
-                            {{ $this->selectedConversationId && in_array($contact->_id, $this->selectedConversation?->participants ?? [])
-                                ? 'bg-[#202024] border border-white/5'
-                                : 'hover:bg-[#202024]/60 border border-transparent' }}">
+                    @mouseenter="window.SanCoMotion?.animateHoverPill($refs.hoverPill, $el)"
+                    class="relative w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 group z-10 
+                            {{ $isSelected
+                                ? 'bg-[#27272a] border border-pink-500/40 shadow-lg shadow-pink-500/10'
+                                : 'border border-transparent' }}">
 
-                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.includes('{{ $contact->_id }}') }"
-                        @presence-updated.window="isOnline = window.onlineUsers.includes('{{ $contact->_id }}')">
+                    @if ($isSelected)
+                        <div class="absolute left-0 top-3 bottom-3 w-1 bg-pink-500 rounded-r-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
+                    @endif
+
+                    <div class="relative flex-shrink-0" x-data="{ isOnline: window.onlineUsers.has('{{ $contact->_id }}') }"
+                        @presence-updated.window="isOnline = window.onlineUsers.has('{{ $contact->_id }}')">
 
                         <img src="{{ $contact->avatar ?? 'https://ui-avatars.com/api/?size=100&background=3f3f46&color=fff&name=' . urlencode($contact->name) }}"
                             referrerpolicy="no-referrer"
-                            class="w-11 h-11 rounded-full object-cover border border-white/10 group-hover:border-white/20 transition-all shadow-sm">
+                            class="w-11 h-11 rounded-full object-cover border {{ $isSelected ? 'border-pink-500/40 shadow-sm shadow-pink-500/20' : 'border-white/10 group-hover:border-white/20' }} transition-all">
 
                         <div :class="isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-[#52525b]'"
                             class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#18181b] transition-all duration-500">
                         </div>
                     </div>
 
-                    <div class=" flex-1 min-w-0 text-left">
+                    <div class="flex-1 min-w-0 text-left">
                         <div class="flex items-center justify-between">
                             <h3
-                                class="text-[13px] font-semibold text-white truncate group-hover:text-pink-50 transition-colors">
+                                class="text-[13px] font-semibold {{ $isSelected ? 'text-pink-400 font-bold' : 'text-white group-hover:text-pink-50' }} transition-colors truncate">
                                 {{ $contact->name }}
                             </h3>
                         </div>
-                        <p class="text-[11px] text-[#71717a] truncate mt-0.5">
+                        <p class="text-[11px] {{ $isSelected ? 'text-pink-400/70' : 'text-[#71717a]' }} truncate mt-0.5">
                             {{ $contact->user_tag ?? 'No Tag' }}
                         </p>
                     </div>
 
-                    <div class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <svg class="w-4 h-4 text-[#52525b]" fill="none" stroke="currentColor"
+                    <div class="flex-shrink-0 {{ $isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100' }} transition-opacity">
+                        <svg class="w-4 h-4 {{ $isSelected ? 'text-pink-400' : 'text-[#52525b]' }}" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
                             </path>
@@ -548,6 +405,14 @@ new class extends Component {
                 </div>
             @endforelse
             {{-- end contacts loop --}}
+        </div>
+
+        <!-- Resizer Handle -->
+        <div x-show="!isSidebarCollapsed"
+            @mousedown.prevent="startResizing($event)"
+            class="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-pink-500/50 active:bg-pink-500 transition-colors z-30 group"
+            title="Drag to resize sidebar">
+            <div class="h-full w-0.5 mx-auto bg-transparent group-hover:bg-pink-500 transition-colors"></div>
         </div>
     </div>
 
@@ -574,7 +439,7 @@ new class extends Component {
                             this.$dispatch('open-security-tab');
                             return;
                         }
-                        
+                
                         try {
                             const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
                             sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
@@ -587,15 +452,22 @@ new class extends Component {
                         }
                     }
                 }">
+                    <button @click="toggleSidebar()"
+                        class="p-2 rounded-xl text-[#71717a] hover:text-white hover:bg-white/5 transition flex items-center justify-center shrink-0"
+                        :title="isSidebarCollapsed ? 'Expand Chat List' : 'Collapse Chat List'">
+                        <svg class="w-5 h-5 transition-transform duration-300" :class="isSidebarCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
                     <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 shadow-md">
                         <img src="{{ $selInfo['avatar'] }}" alt="{{ $selInfo['name'] }}"
                             class="w-full h-full object-cover">
                     </div>
 
                     <div wire:key="header-presence-{{ $otherUserId }}" x-data="{
-                        isOnline: window.onlineUsers.includes('{{ $otherUserId }}')
+                        isOnline: window.onlineUsers.has('{{ $otherUserId }}')
                     }"
-                        @presence-updated.window="isOnline = window.onlineUsers.includes('{{ $otherUserId }}')">
+                        @presence-updated.window="isOnline = window.onlineUsers.has('{{ $otherUserId }}')">
 
                         <h2 class="text-white text-[15px] font-bold leading-tight">{{ $selInfo['name'] }}</h2>
                         <div class="flex items-center gap-2 mt-0.5 font-sans">
@@ -604,7 +476,9 @@ new class extends Component {
                                 $othersMissing = collect($selected->participant_public_keys)
                                     ->forget(auth()->id())
                                     ->contains(null);
-                                $allKeysSet = count($selected->participant_public_keys) > 0 && !collect($selected->participant_public_keys)->contains(null);
+                                $allKeysSet =
+                                    count($selected->participant_public_keys) > 0 &&
+                                    !collect($selected->participant_public_keys)->contains(null);
                             @endphp
 
                             @if ($allKeysSet)
@@ -639,7 +513,8 @@ new class extends Component {
                                     Update Your Keys
                                 </button>
                             @else
-                                <span class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
+                                <span
+                                    class="flex items-center gap-1 text-[10px] text-[#71717a] font-bold uppercase tracking-wider">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -647,9 +522,12 @@ new class extends Component {
                                     Standard (Waiting for keys)
                                 </span>
                             @endif
-                            
-                            <span x-show="isOnline" class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider" style="display:none;">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span>
+
+                            <span x-show="isOnline"
+                                class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider"
+                                style="display:none;">
+                                <span
+                                    class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span>
                                 Online
                             </span>
                         </div>
@@ -680,13 +558,58 @@ new class extends Component {
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                     </button>
-                    <button class="transition hidden md:block hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
-                            </path>
-                        </svg>
-                    </button>
+                    @if (!$isSelf && $otherUserId)
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open"
+                                class="transition hover:text-white focus:outline-none p-1 rounded-lg hover:bg-white/5">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
+                                    </path>
+                                </svg>
+                            </button>
+
+                            <div x-show="open" @click.away="open = false"
+                                x-transition:enter="transition ease-out duration-100"
+                                x-transition:enter-start="transform opacity-0 scale-95"
+                                x-transition:enter-end="transform opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-75"
+                                x-transition:leave-start="transform opacity-100 scale-100"
+                                x-transition:leave-end="transform opacity-0 scale-95"
+                                class="absolute right-0 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
+                                style="display: none;">
+                                <button wire:click="toggleMute('{{ $otherUserId }}')" @click="open = false"
+                                    class="w-full text-left px-4 py-2.5 text-xs font-semibold text-[#a1a1aa] hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition">
+                                    <svg class="w-4 h-4 text-[#71717a]" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                    </svg>
+                                    Mute Notifications
+                                </button>
+                                <button wire:click="unfriend('{{ $otherUserId }}')" @click="open = false"
+                                    class="w-full text-left px-4 py-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-400/10 flex items-center gap-2.5 transition border-t border-white/5">
+                                    <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6h12a6 6 0 00-6-6zM21 12h-6" />
+                                    </svg>
+                                    Remove Friend
+                                </button>
+                                <button wire:click="blockUser('{{ $otherUserId }}')" @click="open = false"
+                                    class="w-full text-left px-4 py-2.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 flex items-center gap-2.5 transition">
+                                    <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                    Block User
+                                </button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -701,13 +624,15 @@ new class extends Component {
                 
                         if (this.convoId) {
                             window.Echo.private('message.' + this.convoId)
-                                .listen('MessageSent', (e) => {
-                
+                                .listen('MessageSent', () => {
                                     $wire.$refresh().then(() => {
-                                        // Scroll down so you can actually read the new message
                                         this.scrollToBottom();
                                     });
-                
+                                })
+                                .listen('.MessageSent', () => {
+                                    $wire.$refresh().then(() => {
+                                        this.scrollToBottom();
+                                    });
                                 });
                         }
                     },
@@ -725,13 +650,10 @@ new class extends Component {
                         $previousMessage = null;
                     @endphp
 
+                    <div class="px-6 space-y-2 py-4">
                     @foreach ($selected->messages as $message)
                         @php
-                            // Check if the message is yours
                             $isYou = (string) $message->sender_id === (string) auth()->id();
-
-                            // Set Name & Avatar
-                            $senderName = $isYou ? 'You' : $selInfo['name'] ?? 'User';
                             $senderAvatar = $isYou
                                 ? auth()->user()->avatar ??
                                     'https://ui-avatars.com/api/?background=ec4899&color=fff&name=Me'
@@ -750,79 +672,55 @@ new class extends Component {
                             }
                         @endphp
 
-                        @if ($showHeader)
-                            <div class="mt-5 px-6 py-1.5 hover:bg-[#202024]/50 transition-all duration-200 group flex justify-start items-start gap-4 rounded-lg w-full text-left"
-                                wire:key="msg-{{ $message->_id }}">
-                                <img src="{{ $senderAvatar }}"
-                                    class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80 hover:scale-105 flex-shrink-0 mt-0.5 shadow-sm transition-all duration-200 ring-1 ring-white/5">
+                        <div class="flex items-end gap-2.5 w-full {{ $isYou ? 'justify-end' : 'justify-start' }} message-bubble-anim msg-slide-ease-in {{ $showHeader ? 'mt-3 first:mt-0' : 'mt-1' }}"
+                            x-init="$nextTick(() => window.SanCoMotion?.animateMessageSlideIn($el))"
+                            wire:key="msg-{{ $message->_id }}">
+                            
+                            {{-- Receiver Avatar (Only for contact messages) --}}
+                            @if (!$isYou)
+                                @if ($showHeader)
+                                    <img src="{{ $senderAvatar }}"
+                                        class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-white/10 shadow-sm mb-0.5">
+                                @else
+                                    <div class="w-8 shrink-0 select-none"></div>
+                                @endif
+                            @endif
 
-                                <div class="flex flex-col flex-1 min-w-0 text-left">
-                                    {{-- Modified this flex container to push the header timestamp to the right --}}
-                                    <div class="flex items-baseline justify-between mb-1 w-full pr-2">
-                                        <span
-                                            class="text-[15px] font-semibold {{ $isYou ? 'text-pink-400' : 'text-white' }} hover:underline cursor-pointer tracking-wide">
-                                            {{ $senderName }}
-                                        </span>
-                                        <span
-                                            class="text-[11px] font-medium text-[#52525b] group-hover:text-[#71717a] group-hover:tracking-[0.08em] transition-all duration-300 ease-out">
-                                            {{ $message->created_at->format('M j, g:i A') }}
-                                        </span>
-                                    </div>
-                                    <div x-data="{
-                                        decryptedBody: @js($message->body),
-                                        async init() {
-                                            this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
-                                                @js($message->body),
-                                                @js($message->metadata),
-                                                @js((string) auth()->id())
-                                            );
-                                        }
-                                    }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
-                                        {{ $message->body }}
-                                    </div>
-                                </div>
-                            </div>
-                        @else
-                            <div class="px-6 py-[3px] hover:bg-[#202024]/50 transition-all duration-200 group flex justify-start items-start gap-4 relative rounded-lg w-full text-left"
-                                wire:key="msg-{{ $message->_id }}">
-
-                                {{-- Empty spacer to keep text aligned with the avatar messages --}}
-                                <div class="w-10 flex-shrink-0 select-none"></div>
-
-                                {{-- Message Body --}}
-                                <div class="flex flex-col flex-1 min-w-0 text-left">
-                                    <div x-data="{
-                                        decryptedBody: @js($message->body),
-                                        async init() {
-                                            this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
-                                                @js($message->body),
-                                                @js($message->metadata),
-                                                @js((string) auth()->id())
-                                            );
-                                        }
-                                    }" class="text-[14.5px] text-[#dbdee1] leading-[1.5rem] whitespace-pre-wrap break-words text-left w-full" x-text="decryptedBody">
-                                        {{ $message->body }}
-                                    </div>
-                                </div>
-
-                                {{-- Timestamp moved to the right, appearing on hover --}}
-                                <div
-                                    class="flex-shrink-0 flex items-center justify-end pl-2 pr-2 select-none opacity-0 group-hover:opacity-100 transition-all duration-200">
+                            {{-- Message Bubble containing text + inline timestamp --}}
+                            <div class="group relative max-w-[80%] sm:max-w-[72%]">
+                                <div x-data="{
+                                    decryptedBody: @js($message->body),
+                                    async init() {
+                                        this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
+                                            @js($message->body),
+                                            @js($message->metadata),
+                                            @js((string) auth()->id())
+                                        );
+                                    }
+                                }"
+                                    class="px-4 py-2.5 rounded-2xl text-[14.5px] leading-[1.45] break-words transition-all shadow-sm {{ $isYou ? 'bg-purple-600 text-white rounded-br-xs' : 'bg-[#202024] text-[#e4e4e7] border border-white/5 rounded-bl-xs' }}">
+                                    <span x-text="decryptedBody">{{ $message->body }}</span>
                                     <span
-                                        class="text-[10px] font-medium text-[#52525b] group-hover:text-[#71717a] group-hover:tracking-[0.12em] leading-[1.5rem] transition-all duration-300 ease-out">
-                                        {{ $message->created_at->format('g:i A') }}
+                                        x-data="{
+                                            formattedTime: '',
+                                            init() {
+                                                const d = new Date(@js($message->created_at->toISOString()));
+                                                this.formattedTime = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+                                            }
+                                        }"
+                                        x-text="formattedTime"
+                                        class="inline-block text-[10px] {{ $isYou ? 'text-white/80 font-medium' : 'text-[#71717a]' }} ml-3 mt-1 float-right align-bottom select-none">
+                                        {{ $message->created_at->setTimezone(config('app.timezone', 'Asia/Kuala_Lumpur'))->format('g:i A') }}
                                     </span>
                                 </div>
-
                             </div>
-                        @endif
-                        {{-- end showHeader check --}}
+                        </div>
 
                         @php
-                            // Save this message to compare against the next one in the loop
                             $previousMessage = $message;
                         @endphp
                     @endforeach
+                    </div>
                     {{-- end messages loop --}}
                 @else
                     <div class="flex-1 flex flex-col items-center justify-center text-center px-4">
@@ -844,135 +742,212 @@ new class extends Component {
                             Messages</span>
                     </div>
                 @endif
-                <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3" x-data="{
-                    maxSize: 10 * 1024 * 1024, // 10MB
-                    fileName: '',
-                    localBody: '',
-                    handleFile(e) {
-                        const file = e.target.files[0];
-                        if (!file) {
+                <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3"
+                    x-data="{
+                        maxSize: 10 * 1024 * 1024, // 10MB
+                        fileName: '',
+                        localBody: '',
+                        handleFile(e) {
+                            const file = e.target.files[0];
+                            if (!file) {
+                                this.fileName = '';
+                                return;
+                            }
+                            if (file.size > this.maxSize) {
+                                alert('File size exceeds 10MB limit.');
+                                e.target.value = '';
+                                this.fileName = '';
+                                return;
+                            }
+                            this.fileName = file.name;
+                        },
+                        removeFile() {
+                            document.getElementById('attachment-input').value = '';
                             this.fileName = '';
-                            return;
-                        }
-                        if (file.size > this.maxSize) {
-                            alert('File size exceeds 10MB limit.');
-                            e.target.value = '';
-                            this.fileName = '';
-                            return;
-                        }
-                        this.fileName = file.name;
-                    },
-                    removeFile() {
-                        document.getElementById('attachment-input').value = '';
-                        this.fileName = '';
-                    },
-                    async encryptAndSend() {
-                        const body = this.localBody;
-                        if (!body || !body.trim()) return;
+                        },
+                    
+                        // ── Key Cache ────────────────────────────────────────────────────────
+                        // Participant public keys are nearly static (only change on explicit key
+                        // regeneration). Caching them in sessionStorage avoids a Livewire round-
+                        // trip + MongoDB query on every single message send.
+                        // Cache is keyed by conversationId so switching conversations is isolated.
+                        _convId: @js((string) $this->selectedConversationId ?? ''),
+                        _cacheKey() { return 'e2e_keys_' + this._convId; },
+                        _readKeyCache() {
+                            try {
+                                const v = sessionStorage.getItem(this._cacheKey());
+                                return v ? JSON.parse(v) : null;
+                            } catch { return null; }
+                        },
+                        _writeKeyCache(keys) {
+                            try { sessionStorage.setItem(this._cacheKey(), JSON.stringify(keys)); } catch (e) { console.warn('E2E: Key cache write failed:', e); }
+                        },
+                    
+                        // ── Initialization ───────────────────────────────────────────────────
+                        // The PHP selectedConversation() computed property already queries participant
+                        // public keys as part of loading the conversation — that data is available in
+                        // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
+                        init() {
+                            const renderKeys = @js($selected->participant_public_keys ?? []);
+                            if (renderKeys && Object.keys(renderKeys).length > 0) {
+                                this._writeKeyCache(renderKeys);
+                            }
+                        },
+                    
+                        // ── Main send ────────────────────────────────────────────────────────
+                        async encryptAndSend() {
+                            const body = this.localBody;
+                            if (!body || !body.trim()) return;
+                    
+                            const userId = @js((string) auth()->id());
+                            let privateKey = sessionStorage.getItem('e2e_private_' + userId);
+                            let publicKey = sessionStorage.getItem('e2e_public_' + userId);
+                    
+                            // Recover keys from mnemonic if sessionStorage is empty (new tab / session wipe)
+                            if (!privateKey || !publicKey) {
+                                const mnemonic = sessionStorage.getItem('e2e_recovery_' + userId);
+                                if (mnemonic) {
+                                    try {
+                                        const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                                        sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                                        sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                                        privateKey = keyPair.privateKey;
+                                        publicKey = keyPair.publicKey;
+                                        if (window._syncPublicKeyToServer) {
+                                            await window._syncPublicKeyToServer(publicKey);
+                                        }
+                                    } catch (e) {
+                                        console.error('E2E: Failed to recover keys:', e);
+                                    }
+                                }
+                            }
+                    
+                            // Cache-first key resolution:
+                            //   HIT  (all keys non-null) → use cache, zero server round-trips.
+                            //   MISS (cache empty or any key is null) → call getParticipantKeys(),
+                            //        write result back to cache, all future sends are free.
+                            let keys = this._readKeyCache();
+                            let cacheComplete = keys &&
+                                Object.keys(keys).length > 0 &&
+                                Object.values(keys).every(k => !!k);
 
-                        let keys = @js($selected->participant_public_keys ?? []);
-                        const userId = @js((string) auth()->id());
-                        let privateKey = sessionStorage.getItem('e2e_private_' + userId);
-                        let publicKey = sessionStorage.getItem('e2e_public_' + userId);
-
-                        // Try to recover keys from localStorage if session is empty
-                        if (!privateKey || !publicKey) {
-                            const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
-                            if (mnemonic) {
+                            if (!cacheComplete) {
+                                console.log('E2E: Key cache miss or incomplete keys — fetching fresh keys from server.');
                                 try {
-                                    const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
-                                    sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
-                                    sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
-                                    privateKey = keyPair.privateKey;
-                                    publicKey = keyPair.publicKey;
+                                    keys = await $wire.getParticipantKeys();
+                                    if (keys && Object.keys(keys).length > 0) {
+                                        this._writeKeyCache(keys);
+                                    }
                                 } catch (e) {
-                                    console.error('Failed to recover keys:', e);
+                                    console.error('E2E: Failed to fetch participant keys:', e);
+                                    keys = keys || @js($selected->participant_public_keys ?? []);
+                                }
+                            }
+                    
+                            // If our own key is missing from the map (e.g. previous sync failed or
+                            // key was just regenerated), inject it and push to server.
+                            if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
+                                console.warn('E2E: Own key mismatch — syncing to server.');
+                                if (window._syncPublicKeyToServer) {
+                                    await window._syncPublicKeyToServer(publicKey);
+                                }
+                                keys[userId] = publicKey;
+                                this._writeKeyCache(keys); // keep cache consistent
+                            }
+                    
+                            const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
+                            const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
+                    
+                            if (canEncrypt) {
+                                let encResult = null;
+                                try {
+                                    console.log('E2E: Encrypting message for ' + Object.keys(keys).length + ' recipient(s)...');
+                                    encResult = await window.EncryptionService.encryptMessage(body, keys, privateKey);
+                                } catch (e) {
+                                    console.error('E2E: Encryption failed — message NOT sent.', e);
+                                    if (window.notyf) {
+                                        window.notyf.error('Encryption failed. Message not sent.');
+                                    }
+                                    return;
+                                }
+                    
+                                try {
+                                    await $wire.messageUser(encResult.encBody, encResult.nonce, encResult.keys);
+                                } catch (e) {
+                                    // The encrypted message was likely already saved; the error came from
+                                    // a Livewire post-send side-effect (e.g. scroll-bottom dispatch).
+                                    console.warn('E2E: Post-send Livewire error (message was saved):', e);
+                                }
+                    
+                                this.localBody = '';
+                                this.removeFile();
+                            } else {
+                                console.warn('E2E: Cannot send — participant keys are missing.', {
+                                    hasPrivateKey: !!privateKey,
+                                    missingFrom: participantsMissingKeys.map(p => p[0])
+                                });
+                                if (window.notyf) {
+                                    window.notyf.error('Cannot send: missing encryption keys for one or more participants.');
                                 }
                             }
                         }
-
-                        // PROACTIVE SYNC: If we have a public key locally but the server is missing it for US
-                        if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
-                            console.log('E2E: Syncing public key to server before sending...');
-                            await $wire.savePublicKey(publicKey);
-                            keys[userId] = publicKey;
-                        }
-
-                        // Check if we have public keys for ALL participants
-                        const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
-                        const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
-
-                        if (canEncrypt) {
-                            try {
-                                console.log('E2E: Encrypting message for ' + Object.keys(keys).length + ' recipient(s)...');
-                                const result = await window.EncryptionService.encryptMessage(body, keys, privateKey);
-                                await $wire.messageUser(result.encBody, result.nonce, result.keys);
-                                this.localBody = '';
-                                this.removeFile();
-                            } catch (e) {
-                                console.error('E2E Error during encryption:', e);
-                                alert('Encryption failed. Sending as standard message.');
-                                await $wire.messageUser(body); 
-                                this.localBody = '';
-                                this.removeFile();
-                            }
-                        } else {
-                            console.warn('E2E: Sending as standard text because keys are missing.', {
-                                hasPrivateKey: !!privateKey,
-                                missingFrom: participantsMissingKeys.map(p => p[0])
-                            });
-                            await $wire.messageUser(body);
-                            this.localBody = '';
-                            this.removeFile();
-                        }
-                    }
-                }">
-
-                    <div>
-                        <input type="file" id="attachment-input" class="hidden" @change="handleFile">
-                        <button type="button" @click="document.getElementById('attachment-input').click()"
-                            class="text-[#52525b] hover:text-white transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
-                                </path>
-                            </svg>
-                        </button>
-
-                        <!-- Simple file preview badge -->
-                        <div x-show="fileName"
-                            class="absolute bottom-full left-0 mb-2 bg-[#202024] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg"
-                            style="display: none;">
-                            <span class="text-xs text-white truncate max-w-[150px]" x-text="fileName"></span>
-                            <button type="button" @click="removeFile"
-                                class="text-[#71717a] hover:text-red-500 transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    }">
+                    <fieldset class="contents" :disabled="!isUnlocked">
+                        <div>
+                            <input type="file" id="attachment-input" class="hidden" @change="handleFile">
+                            <button type="button" @click="document.getElementById('attachment-input').click()"
+                                class="text-[#52525b] hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"></path>
+                                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                                    </path>
                                 </svg>
                             </button>
+
+                            <!-- Simple file preview badge -->
+                            <div x-show="fileName"
+                                class="absolute bottom-full left-0 mb-2 bg-[#202024] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg"
+                                style="display: none;">
+                                <span class="text-xs text-white truncate max-w-[150px]" x-text="fileName"></span>
+                                <button type="button" @click="removeFile"
+                                    class="text-[#71717a] hover:text-red-500 transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
-                        class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
-                        autocomplete="off">
+                        <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
+                            class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
+                            autocomplete="off">
 
-                    <button type="submit"
-                        class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        wire:loading.attr="disabled">
-                        <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                        </svg>
-                    </button>
+                        <button type="submit"
+                            class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            wire:loading.attr="disabled">
+                            <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                            </svg>
+                        </button>
+                    </fieldset>
                 </form>
             </div>
             {{-- end isSelf footer check --}}
         @else
-            <div class="flex-1 flex items-center justify-center">
+            <div class="flex-1 flex items-center justify-center relative">
+                <button x-show="isSidebarCollapsed" @click="toggleSidebar()"
+                    class="absolute top-4 left-4 p-2.5 rounded-xl bg-[#1e1e21] border border-white/10 text-[#a1a1aa] hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 text-xs font-semibold shadow-lg">
+                    <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <span>Open Contacts List</span>
+                </button>
                 <div class="text-center space-y-4">
                     <div class="p-2 bg-[#1e1e21] rounded-2xl inline-block border border-white/5 shadow-2xl">
-                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto" alt="SanCo Logo" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; filter: hue-rotate(310deg) saturate(12) brightness(1.6) contrast(1.4) drop-shadow(0 0 4px rgba(255, 0, 127, 0.9));">
+                        <img src="{{ asset('images/logo/SanCo.png') }}" class="w-24 h-24 object-contain mx-auto"
+                            alt="SanCo Logo">
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-white">Your Chat Canvas</h2>
@@ -1017,7 +992,8 @@ new class extends Component {
 
             <div class="relative flex bg-[#18181b] p-1 rounded-2xl mb-8 overflow-hidden">
                 <div class="absolute top-1 bottom-1 left-1 transition-all duration-300 ease-out bg-[#202024] rounded-xl shadow-sm z-0"
-                    :style="addFriendTab === 'id' ? 'width: calc(50% - 4px); left: 4px' : 'width: calc(50% - 4px); left: 50%'">
+                    :style="addFriendTab === 'id' ? 'width: calc(50% - 4px); left: 4px' :
+                        'width: calc(50% - 4px); left: 50%'">
                 </div>
 
                 <button @click="addFriendTab = 'id'"
@@ -1039,7 +1015,8 @@ new class extends Component {
                     <div class="w-1/2 flex-shrink-0 px-1">
                         <form wire:submit.prevent="addFriend" class="space-y-5">
                             <div class="space-y-2">
-                                <label class="text-[10px] font-bold text-[#71717a] uppercase tracking-wider ml-1">User Tag ID</label>
+                                <label class="text-[10px] font-bold text-[#71717a] uppercase tracking-wider ml-1">User
+                                    Tag ID</label>
                                 <div class="relative flex items-center">
                                     <span class="absolute left-4 text-pink-500 font-bold">@</span>
                                     <input type="text" wire:model="searchUserTag" placeholder="SanCo_usertag"
@@ -1069,13 +1046,16 @@ new class extends Component {
                                         <img src="{{ $searchResult->avatar ?? 'https://ui-avatars.com/api/?size=100&background=ec4899&color=fff&name=' . urlencode($searchResult->name) }}"
                                             referrerpolicy="no-referrer"
                                             class="w-16 h-16 rounded-2xl border border-white/10 object-cover shadow-md">
-                                        <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#202024]"></div>
+                                        <div
+                                            class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#202024]">
+                                        </div>
                                     </div>
                                     <div class="mb-4">
                                         <h4 class="text-lg font-bold text-white tracking-tight">
                                             {{ $searchResult->name }}
                                         </h4>
-                                        <p class="text-[15px] text-pink-500 font-mono tracking-wider uppercase opacity-80">
+                                        <p
+                                            class="text-[15px] text-pink-500 font-mono tracking-wider uppercase opacity-80">
                                             {{ $searchResult->user_tag }}
                                         </p>
                                     </div>
@@ -1087,7 +1067,7 @@ new class extends Component {
                             @endif
                         </form>
                     </div>
- 
+
                     <div class="w-1/2 flex-shrink-0 px-1">
                         <div class="space-y-6">
                             <div class="bg-pink-500/5 border border-pink-500/10 rounded-2xl p-5">
@@ -1138,13 +1118,29 @@ new class extends Component {
                     </button>
                 </div>
             </div>
-        </div> 
+        </div>
     </div>{{-- end modal outer container --}}
 
     @include('livewire.messenger.settings-overlay')
     @include('livewire.messenger.pending-requests-overlay')
 
     <style>
+        @keyframes msgSlideEaseIn {
+            0% {
+                opacity: 0;
+                transform: translateY(22px) scale(0.97);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .msg-slide-ease-in {
+            animation: msgSlideEaseIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            will-change: transform, opacity;
+        }
+
         .custom-scrollbar::-webkit-scrollbar {
             width: 4px;
         }
