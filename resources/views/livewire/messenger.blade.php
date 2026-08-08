@@ -565,18 +565,23 @@ new class extends Component {
             <div
                 class="h-16 flex items-center justify-between px-6 py-4 bg-[#1e1e21]/80 backdrop-blur-md border-b border-[#2a2a2d] z-10 sticky top-0">
                 <div class="flex items-center gap-4" x-data="{
+                    hasLocalKey: !!sessionStorage.getItem('e2e_private_' + @js((string) auth()->id())),
                     async syncMyKey() {
                         const userId = @js((string) auth()->id());
                         const mnemonic = localStorage.getItem('e2e_recovery_' + userId);
                         if (!mnemonic) {
-                            window.notyf.error('No recovery key found. Please generate one in Settings.');
+                            window.notyf.error('No recovery key found. Please restore it in Settings.');
+                            this.$dispatch('open-security-tab');
                             return;
                         }
                         
                         try {
                             const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
-                            await $wire.savePublicKey(keyPair.publicKey);
+                            sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                            sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
                             window.notyf.success('Security keys synced!');
+                            this.hasLocalKey = true;
+                            $wire.$refresh();
                         } catch (e) {
                             console.error('Manual sync failed:', e);
                         }
@@ -593,7 +598,7 @@ new class extends Component {
                         @presence-updated.window="isOnline = window.onlineUsers.includes('{{ $otherUserId }}')">
 
                         <h2 class="text-white text-[15px] font-bold leading-tight">{{ $selInfo['name'] }}</h2>
-                        <div class="flex items-center gap-2 mt-0.5">
+                        <div class="flex items-center gap-2 mt-0.5 font-sans">
                             @php
                                 $myKey = $selected->participant_public_keys[auth()->id()] ?? null;
                                 $othersMissing = collect($selected->participant_public_keys)
@@ -603,18 +608,30 @@ new class extends Component {
                             @endphp
 
                             @if ($allKeysSet)
-                                <span
-                                    class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd"
-                                            d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    Encrypted
-                                </span>
+                                <template x-if="hasLocalKey">
+                                    <span
+                                        class="flex items-center gap-1 text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd"
+                                                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                        Encrypted
+                                    </span>
+                                </template>
+                                <template x-if="!hasLocalKey">
+                                    <button type="button" @click="$dispatch('open-security-tab')"
+                                        class="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-600 font-bold uppercase tracking-wider transition-colors group/sec cursor-pointer">
+                                        <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                        Keys Missing (Restore)
+                                    </button>
+                                </template>
                             @elseif(!$myKey)
                                 <button type="button" @click="syncMyKey()"
-                                    class="flex items-center gap-1 text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase tracking-wider transition-colors group/sec">
+                                    class="flex items-center gap-1 text-[10px] text-pink-500 hover:text-pink-600 font-bold uppercase tracking-wider transition-colors group/sec cursor-pointer">
                                     <svg class="w-3 h-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

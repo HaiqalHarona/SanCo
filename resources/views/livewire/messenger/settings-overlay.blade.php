@@ -2,6 +2,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
 <div x-show="showSettings"
+    @open-security-tab.window="activeTab = 'security'; showSettings = true"
     class="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-md dark:backdrop-blur-md"
     x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
     x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
@@ -112,6 +113,29 @@
             } catch (e) {
                 console.error('Manual sync failed:', e);
                 window.notyf.error('Sync failed. See console.');
+            }
+        },
+
+        async restoreKey(key) {
+            const trimmed = key.trim();
+            if (!trimmed) {
+                window.notyf.error('Please enter a recovery key.');
+                return;
+            }
+            
+            try {
+                const keyPair = await window.EncryptionService.deriveKeyPair(trimmed);
+                const userId = window.userId;
+                localStorage.setItem('e2e_recovery_' + userId, trimmed);
+                sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                this.recoveryKey = trimmed;
+                
+                await $wire.savePublicKey(keyPair.publicKey);
+                window.notyf.success('Recovery Key restored successfully!');
+            } catch (e) {
+                console.error('Key restoration failed:', e);
+                window.notyf.error('Invalid recovery key. Please check the words.');
             }
         },
 
@@ -305,15 +329,26 @@
                                     x-text="recoveryKey"></p>
                             </div>
 
-                            {{-- EMPTY STATE --}}
-                            <div x-show="!recoveryKey" class="flex flex-col items-center gap-4" x-cloak>
-                                <p class="text-gray-400 dark:text-gray-500 tracking-widest text-xs">
-                                    NO KEY FOUND
+                            {{-- EMPTY STATE / RESTORE STATE --}}
+                            <div x-show="!recoveryKey" class="w-full flex flex-col items-center gap-4 p-2" x-cloak x-data="{ inputKey: '' }">
+                                <p class="text-gray-400 dark:text-gray-500 tracking-wider text-xs font-bold uppercase">
+                                    No Key Loaded on This Device
                                 </p>
-                                <button type="button" @click="generateKey()"
-                                    class="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md">
-                                    Generate New Key
-                                </button>
+                                <div class="w-full space-y-3">
+                                    <textarea x-model="inputKey" placeholder="Paste your 24-word recovery key here..."
+                                        class="w-full bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-pink-500/50 transition-all resize-none h-20 placeholder:text-[#52525b]"></textarea>
+                                    
+                                    <div class="flex gap-3">
+                                        <button type="button" @click="restoreKey(inputKey)"
+                                            class="flex-1 py-2.5 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-all shadow-md active:scale-95 cursor-pointer">
+                                            Restore Key
+                                        </button>
+                                        <button type="button" @click="generateKey()"
+                                            class="flex-1 py-2.5 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-white text-xs font-bold rounded-lg border border-gray-200 dark:border-white/10 transition-all active:scale-95 cursor-pointer">
+                                            Generate New
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

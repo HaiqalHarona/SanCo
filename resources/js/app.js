@@ -21,11 +21,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
                 
                 // Use the Livewire component if available on page, otherwise fallback to fetch
-                const messenger = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
-                if (messenger) {
-                    await messenger.savePublicKey(keyPair.publicKey);
-                    console.log('Public key synced via Livewire.');
-                } else {
+                let synced = false;
+                const messengerEl = document.querySelector('[wire\\:id]');
+                if (messengerEl && window.Livewire) {
+                    const messenger = window.Livewire.find(messengerEl.getAttribute('wire:id'));
+                    if (messenger) {
+                        await messenger.savePublicKey(keyPair.publicKey);
+                        console.log('Public key synced via Livewire.');
+                        synced = true;
+                    }
+                }
+                
+                if (!synced) {
                     await fetch('/api/save-public-key', {
                         method: 'POST',
                         headers: {
