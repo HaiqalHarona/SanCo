@@ -25,6 +25,12 @@
       "skillPath": ".ai/pennant/skill/pennant-development/SKILL.md",
       "computedHash": "ae02f00f5aecb79a1fdda8d0c41373d504738827bdbfff463edb87f5f95419a1"
     },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "a2750dfbaed1690da73b120254892c4f926b4576cb82eb16fc877783941fe39b"
+    },
     "tailwindcss-development": {
       "source": "laravel/boost",
       "sourceType": "github",

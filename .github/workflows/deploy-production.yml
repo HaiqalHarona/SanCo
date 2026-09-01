@@ -1,0 +1,95 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+    branches:
+      - main
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Production Pre-flight Validation
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, json, openssl, mongodb, pdo_sqlite, redis
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run Backend Tests
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+          MONGODB_URI: "mongodb://127.0.0.1:27017"
+          MONGODB_DATABASE: "testing"
+        run: php artisan test
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Test Frontend Build
+        run: |
+          npm ci
+          npm run build
+
+  deploy:
+    name: Deploy to Production Server
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script: |
+            cd ${{ secrets.PROD_TARGET_PATH }}
+            php artisan down --secret="${{ secrets.MAINTENANCE_SECRET || 'sanco-prod-deploy' }}"
+            git fetch origin main
+            git reset --hard origin/main
+            composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+            npm ci
+            npm run build
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan optimize
+            php artisan queue:restart
+            php artisan up
