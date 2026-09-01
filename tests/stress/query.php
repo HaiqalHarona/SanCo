@@ -1,14 +1,15 @@
 <?php
 
 // Bootstrap Laravel from root directory
-require __DIR__ . '/../../vendor/autoload.php';
-$app = require_once __DIR__ . '/../../bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+require __DIR__.'/../../vendor/autoload.php';
+$app = require_once __DIR__.'/../../bootstrap/app.php';
+$kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
-use App\Models\User;
 use App\Models\Friendship;
+use App\Models\User;
 use App\Services\FriendshipService;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Cache;
 
 // Clear cache before starting the test to ensure accurate first-run baseline
@@ -46,7 +47,7 @@ foreach ($users as $user) {
 }
 $endMongo = microtime(true);
 $mongoTime = $endMongo - $startMongo;
-echo "1. MongoDB Direct (Uncached) Time : " . number_format($mongoTime * 1000, 2) . " ms\n";
+echo '1. MongoDB Direct (Uncached) Time : '.number_format($mongoTime * 1000, 2)." ms\n";
 
 // --- Benchmark 2: Redis Cache Miss (MongoDB + Populate Cache) ---
 $startCacheMiss = microtime(true);
@@ -56,7 +57,7 @@ foreach ($users as $user) {
 }
 $endCacheMiss = microtime(true);
 $cacheMissTime = $endCacheMiss - $startCacheMiss;
-echo "2. Redis Cache Miss (DB + Cache Write): " . number_format($cacheMissTime * 1000, 2) . " ms\n";
+echo '2. Redis Cache Miss (DB + Cache Write): '.number_format($cacheMissTime * 1000, 2)." ms\n";
 
 // --- Benchmark 3: Redis Cache Hit (Cached Reads) ---
 // Repeat multiple times to simulate real-world concurrency load
@@ -70,11 +71,11 @@ for ($i = 0; $i < $iterations; $i++) {
 }
 $endCacheHit = microtime(true);
 $cacheHitTime = ($endCacheHit - $startCacheHit) / $iterations;
-echo "3. Redis Cache Hit (Pure In-Memory)   : " . number_format($cacheHitTime * 1000, 2) . " ms (Avg over {$iterations} runs)\n\n";
+echo '3. Redis Cache Hit (Pure In-Memory)   : '.number_format($cacheHitTime * 1000, 2)." ms (Avg over {$iterations} runs)\n\n";
 
 // --- Calculate Results ---
 $speedup = $mongoTime / $cacheHitTime;
 echo "=== Summary ===\n";
-echo "Redis Cache hits are " . number_format($speedup, 1) . "x faster than direct MongoDB queries!\n";
-echo "MongoDB average query time per user: " . number_format(($mongoTime / 100) * 1000, 3) . " ms\n";
-echo "Redis average cache-hit read time : " . number_format(($cacheHitTime / 100) * 1000, 3) . " ms\n";
+echo 'Redis Cache hits are '.number_format($speedup, 1)."x faster than direct MongoDB queries!\n";
+echo 'MongoDB average query time per user: '.number_format(($mongoTime / 100) * 1000, 3)." ms\n";
+echo 'Redis average cache-hit read time : '.number_format(($cacheHitTime / 100) * 1000, 3)." ms\n";

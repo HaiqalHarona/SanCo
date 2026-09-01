@@ -14,6 +14,7 @@ class User extends MongoUser
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $connection = 'mongodb';
+
     protected $collection = 'users';
 
     protected static function boot()

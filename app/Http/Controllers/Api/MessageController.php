@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 class MessageController extends Controller
 {
     protected MessageService $messageService;
+
     protected ConversationService $conversationService;
 
     public function __construct(MessageService $messageService, ConversationService $conversationService)
@@ -26,7 +27,7 @@ class MessageController extends Controller
     public function index(string $conversationId, Request $request): JsonResponse
     {
         $convo = $this->conversationService->getConversation($conversationId);
-        if (!$convo || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if (! $convo || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -61,7 +62,7 @@ class MessageController extends Controller
     public function store(string $conversationId, Request $request): JsonResponse
     {
         $convo = $this->conversationService->getConversation($conversationId);
-        if (!$convo || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if (! $convo || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -93,7 +94,7 @@ class MessageController extends Controller
                     'type' => $message->type,
                     'metadata' => $message->metadata,
                     'created_at' => $message->created_at,
-                ]
+                ],
             ], 201);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -106,12 +107,12 @@ class MessageController extends Controller
     public function read(string $id, Request $request): JsonResponse
     {
         $message = Message::find($id);
-        if (!$message) {
+        if (! $message) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         $convo = $this->conversationService->getConversation($message->conversation_id);
-        if (!$convo || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if (! $convo || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -130,12 +131,12 @@ class MessageController extends Controller
         ]);
 
         $message = Message::find($id);
-        if (!$message) {
+        if (! $message) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         $convo = $this->conversationService->getConversation($message->conversation_id);
-        if (!$convo || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if (! $convo || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -150,12 +151,12 @@ class MessageController extends Controller
     public function unreact(string $id, Request $request): JsonResponse
     {
         $message = Message::find($id);
-        if (!$message) {
+        if (! $message) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         $convo = $this->conversationService->getConversation($message->conversation_id);
-        if (!$convo || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if (! $convo || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 

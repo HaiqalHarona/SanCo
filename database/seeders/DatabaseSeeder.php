@@ -2,12 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Models\Conversation;
-use App\Models\Message;
 use App\Models\Friendship;
+use App\Models\Message;
+use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Schema;
 
 class DatabaseSeeder extends Seeder
 {
@@ -43,7 +42,7 @@ class DatabaseSeeder extends Seeder
             $this->command->line("  [#{$index}] {$user->name} - Tag: {$user->user_tag} - Email: {$user->email}");
         }
         if ($usersCount > 5) {
-            $this->command->line("  ... and " . ($usersCount - 5) . " more users.");
+            $this->command->line('  ... and '.($usersCount - 5).' more users.');
         }
 
         // Setup Friendships using model helper methods to ensure reciprocal/flow integrity
@@ -96,7 +95,7 @@ class DatabaseSeeder extends Seeder
             Friendship::insert($chunk);
         }
 
-        $this->command->info("Seeded " . (count($friendshipsData) / 2) . " random mutual friendships.");
+        $this->command->info('Seeded '.(count($friendshipsData) / 2).' random mutual friendships.');
 
         // Create Conversations
         $u0 = $users[0];
@@ -124,6 +123,6 @@ class DatabaseSeeder extends Seeder
             'metadata' => ['description' => 'Development group chat'],
         ]);
 
-        $this->command->info("Seeded conversations.");
+        $this->command->info('Seeded conversations.');
     }
 }

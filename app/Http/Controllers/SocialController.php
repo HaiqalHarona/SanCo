@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\UserService;
-use FurqanSiddiqui\BIP39\BIP39;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
@@ -38,7 +37,8 @@ class SocialController extends Controller
         try {
             $user = Socialite::driver($provider)->stateless()->user();
         } catch (\Exception $e) {
-            logger()->error('Socialite authentication error: ' . $e->getMessage(), ['exception' => $e]);
+            logger()->error('Socialite authentication error: '.$e->getMessage(), ['exception' => $e]);
+
             return redirect()->route('auth')->with('error', 'Login with '.ucfirst($provider).' failed: '.$e->getMessage());
         }
 
@@ -93,7 +93,7 @@ class SocialController extends Controller
                         $context = stream_context_create([
                             'http' => [
                                 'timeout' => 1.0, // 1 second timeout limit
-                            ]
+                            ],
                         ]);
                         $response = @file_get_contents("http://ip-api.com/json/{$ip}?fields=status,message,country,city", false, $context);
                         if ($response) {
@@ -112,13 +112,14 @@ class SocialController extends Controller
 
                     // Store login metadata in MongoDB (infrequent, non-hot-path)
                     $appUser->update([
-                        'last_login_ip'       => $ip,
-                        'last_login_browser'  => $browser,
+                        'last_login_ip' => $ip,
+                        'last_login_browser' => $browser,
                         'last_login_location' => $location,
                     ]);
 
                     $token = $appUser->createToken('mobile-auth-token')->plainTextToken;
-                    $redirectUrl = 'sanco://auth/callback?token=' . urlencode($token);
+                    $redirectUrl = 'sanco://auth/callback?token='.urlencode($token);
+
                     return redirect($redirectUrl);
                 }
 
@@ -131,8 +132,8 @@ class SocialController extends Controller
 
                 // Store login metadata in MongoDB (infrequent, non-hot-path)
                 $appUser->update([
-                    'last_login_ip'       => $ip,
-                    'last_login_browser'  => $browser,
+                    'last_login_ip' => $ip,
+                    'last_login_browser' => $browser,
                     'last_login_location' => $location,
                 ]);
 
@@ -140,7 +141,8 @@ class SocialController extends Controller
                     return redirect()->route('messenger')
                         ->with('success', 'Welcome! Your account has been created.');
                 }
-                return redirect()->route('messenger')->with('success', 'Welcome '. $appUser->name);
+
+                return redirect()->route('messenger')->with('success', 'Welcome '.$appUser->name);
             }
 
             return redirect()->route('auth')->with('error', 'Authentication provider not recognized.');
@@ -182,8 +184,8 @@ class SocialController extends Controller
         // Clear any specific session data that might linger
         $request->session()->forget([
             'new_master_key',
-            'e2e_private_' . $userId,
-            'e2e_public_' . $userId,
+            'e2e_private_'.$userId,
+            'e2e_public_'.$userId,
         ]);
 
         return redirect()->route('auth')->with('success', 'Logged out successfully');

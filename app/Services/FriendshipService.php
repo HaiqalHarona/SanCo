@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Friendship;
 use App\Models\User;
-use App\Events\IncomingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -15,6 +14,7 @@ class FriendshipService
     public function getFriends(string $userId): Collection
     {
         $userIdStr = (string) $userId;
+
         return Cache::remember("sanco:user:{$userIdStr}:friends", now()->addHours(12), function () use ($userIdStr) {
             $friendships = Friendship::where('status', 'accepted')
                 ->where(function ($q) use ($userIdStr) {
@@ -60,7 +60,7 @@ class FriendshipService
             return Friendship::where('user_id', $userA)
                 ->where('status', 'blocked')
                 ->pluck('friend_id')
-                ->map(fn($id) => (string) $id)
+                ->map(fn ($id) => (string) $id)
                 ->toArray();
         });
 

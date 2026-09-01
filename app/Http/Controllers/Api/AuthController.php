@@ -22,6 +22,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
+
         return response()->json([
             'id' => $user->_id,
             'name' => $user->name,
@@ -60,7 +61,7 @@ class AuthController extends Controller
                 'id' => $user->_id,
                 'name' => $user->name,
                 'avatar' => $user->avatar,
-            ]
+            ],
         ]);
     }
 

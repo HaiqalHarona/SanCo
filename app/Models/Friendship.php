@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use MongoDB\Laravel\Eloquent\Model;
 
 /**
  * Friendship document — stored in the 'friendships' collection.
@@ -23,6 +23,7 @@ class Friendship extends Model
     use HasFactory;
 
     protected $connection = 'mongodb';
+
     protected $collection = 'friendships';
 
     protected $fillable = [
@@ -249,7 +250,7 @@ class Friendship extends Model
         // We use the existing 'incomingFor' scope you already defined
         return static::incomingFor($userId)
             ->with('user')
-            ->latest() 
+            ->latest()
             ->get();
     }
 

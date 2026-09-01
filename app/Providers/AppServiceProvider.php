@@ -2,16 +2,16 @@
 
 namespace App\Providers;
 
-use App\Services\UserService;
-use App\Services\FriendshipService;
-use App\Services\ConversationService;
-use App\Services\MessageService;
 use App\Models\PersonalAccessToken;
+use App\Services\ConversationService;
+use App\Services\FriendshipService;
+use App\Services\MessageService;
+use App\Services\UserService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Sanctum\Sanctum;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {

@@ -1,8 +1,12 @@
 <?php
 
+use App\Http\Middleware\DetectConcurrentLogins;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->statefulApi();
         $middleware->web(append: [
-            \App\Http\Middleware\DetectConcurrentLogins::class,
+            DetectConcurrentLogins::class,
         ]);
         $middleware->redirectTo(
             guests: fn () => session()->flash('error', 'Please log in to access your chats.') ? '/' : '/'
@@ -23,14 +27,14 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Handle session expiration (HTTP 419) by redirecting to login with a message
-        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, \Illuminate\Http\Request $request) {
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
             return redirect()->route('auth')->with('error', 'Your session has expired. Please log in again.');
         });
 
         // Route ALL 4xx HTTP errors to a generic "Page Not Found" page.
         // This prevents users from distinguishing 403 (Forbidden) from 404 (Not Found),
         // which leaks information about whether a resource exists or is access-restricted.
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+        $exceptions->render(function (HttpException $e, Request $request) {
             $status = $e->getStatusCode();
 
             if ($status >= 400 && $status < 500) {

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\IncomingRequest;
 use App\Http\Controllers\Controller;
 use App\Services\FriendshipService;
-use App\Events\IncomingRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,7 +23,7 @@ class FriendshipController extends Controller
     public function index(Request $request): JsonResponse
     {
         $friends = $this->friendshipService->getFriends($request->user()->_id);
-        
+
         $formatted = $friends->map(function ($friend) {
             return [
                 'id' => $friend->_id,
@@ -44,7 +44,7 @@ class FriendshipController extends Controller
     public function pendingRequests(Request $request): JsonResponse
     {
         $pending = $this->friendshipService->getPendingRequests($request->user()->_id);
-        
+
         $formatted = $pending->map(function ($req) {
             return [
                 'id' => $req->_id,
@@ -78,7 +78,7 @@ class FriendshipController extends Controller
 
         try {
             $friendship = $this->friendshipService->sendRequest($senderId, $receiverId);
-            
+
             // Broadcast incoming request event to the receiver
             broadcast(new IncomingRequest($receiverId, $request->user()->name))->toOthers();
 
@@ -98,6 +98,7 @@ class FriendshipController extends Controller
     {
         try {
             $this->friendshipService->acceptRequest($request->user()->_id, $senderId);
+
             return response()->json(['message' => 'Friend request accepted.']);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -111,6 +112,7 @@ class FriendshipController extends Controller
     {
         try {
             $this->friendshipService->rejectRequest($request->user()->_id, $senderId);
+
             return response()->json(['message' => 'Friend request rejected.']);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -124,6 +126,7 @@ class FriendshipController extends Controller
     {
         try {
             $this->friendshipService->unfriend($request->user()->_id, $friendId);
+
             return response()->json(['message' => 'Friend removed successfully.']);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -137,6 +140,7 @@ class FriendshipController extends Controller
     {
         try {
             $this->friendshipService->blockUser($request->user()->_id, $friendId);
+
             return response()->json(['message' => 'User blocked.']);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -150,6 +154,7 @@ class FriendshipController extends Controller
     {
         try {
             $this->friendshipService->unblockUser($request->user()->_id, $friendId);
+
             return response()->json(['message' => 'User unblocked.']);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);

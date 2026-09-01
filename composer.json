@@ -16,6 +16,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.26",
         "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.35",
         "livewire/livewire": "^4.2",
         "livewire/volt": "^1.10",
         "mongodb/laravel-mongodb": "5.7.1",
@@ -90,6 +91,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.2.13"
         }
     },
     "minimum-stability": "stable",

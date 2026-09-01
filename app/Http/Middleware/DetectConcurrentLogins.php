@@ -15,7 +15,7 @@ class DetectConcurrentLogins
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -31,15 +31,15 @@ class DetectConcurrentLogins
             // Constant-time comparison to prevent timing oracle attacks on session tokens
             if ($storedSessionId && ! hash_equals($storedSessionId, $currentSessionId)) {
                 $location = $user->last_login_location ?? 'Unknown';
-                $browser  = $user->last_login_browser  ?? 'Unknown Browser';
-                $avatar   = $user->avatar;
+                $browser = $user->last_login_browser ?? 'Unknown Browser';
+                $avatar = $user->avatar;
 
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
                 return redirect()->route('auth')->with([
-                    'error'  => "Another login detected. You have been logged out. New login from: {$location} using {$browser}.",
+                    'error' => "Another login detected. You have been logged out. New login from: {$location} using {$browser}.",
                     'avatar' => $avatar,
                 ]);
             }

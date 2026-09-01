@@ -7,6 +7,7 @@ use App\Services\UserService;
 trait SettingsActions
 {
     public string $profileName = '';
+
     public $profileAvatar = null;
 
     public function updateProfile()

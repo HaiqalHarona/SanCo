@@ -1,12 +1,13 @@
 <?php
- 
-use Illuminate\Support\Facades\Broadcast;
+
 use App\Broadcasting\UserPresence;
- 
+use App\Models\Conversation;
+use Illuminate\Support\Facades\Broadcast;
+
 Broadcast::channel('presence.chat', UserPresence::class);
- 
+
 Broadcast::channel('message.{conversationId}', function ($user, $conversationId) {
-    return \App\Models\Conversation::where('_id', $conversationId)
+    return Conversation::where('_id', $conversationId)
         ->where('participant_ids', (string) $user->_id)
         ->exists();
 });

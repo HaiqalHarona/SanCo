@@ -2,15 +2,16 @@
 
 namespace App\Livewire\MessengerVolt;
 
-use App\Models\User;
-use App\Services\FriendshipService;
 use App\Events\IncomingRequest;
 use App\Events\LoadContactList;
+use App\Models\User;
+use App\Services\FriendshipService;
 use Livewire\Attributes\Computed;
 
 trait FriendActions
 {
     public $searchUserTag = '';
+
     public $searchResult = null;
 
     #[Computed]
@@ -26,14 +27,14 @@ trait FriendActions
             ->where('_id', '!=', auth()->id())
             ->first();
 
-        if (!$this->searchResult) {
+        if (! $this->searchResult) {
             $this->addError('searchUserTag', 'No user found with that tag. | Cannot search your own user.');
         }
     }
 
     public function addFriend()
     {
-        if (!auth()->user()->master_key) {
+        if (! auth()->user()->master_key) {
             return;
         }
         $this->validate([
@@ -43,13 +44,14 @@ trait FriendActions
         $authUserTag = auth()->user()->user_tag ?? 'No Tag Set';
         if ($authUserTag === 'No Tag Set') {
             $this->addError('searchUserTag', 'Error in creating account contact support');
+
             return;
         }
 
         try {
             app(FriendshipService::class)->sendRequest(auth()->id(), $this->searchResult->_id);
             broadcast(new IncomingRequest($this->searchResult->_id, auth()->user()->name))->toOthers();
-            session()->flash('success', 'Friend request sent to ' . $this->searchResult->name);
+            session()->flash('success', 'Friend request sent to '.$this->searchResult->name);
             $this->dispatch('friend-request-sent');
             $this->reset(['searchUserTag', 'searchResult']);
         } catch (\Exception $e) {

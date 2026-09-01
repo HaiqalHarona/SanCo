@@ -452,13 +452,6 @@ new class extends Component {
                         }
                     }
                 }">
-                    <button @click="toggleSidebar()"
-                        class="p-2 rounded-xl text-[#71717a] hover:text-white hover:bg-white/5 transition flex items-center justify-center shrink-0"
-                        :title="isSidebarCollapsed ? 'Expand Chat List' : 'Collapse Chat List'">
-                        <svg class="w-5 h-5 transition-transform duration-300" :class="isSidebarCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
                     <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 shadow-md">
                         <img src="{{ $selInfo['avatar'] }}" alt="{{ $selInfo['name'] }}"
                             class="w-full h-full object-cover">

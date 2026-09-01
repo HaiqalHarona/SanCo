@@ -27,9 +27,9 @@ class Attachment extends Model
 
     protected $casts = [
         'file_size' => 'integer',
-        'duration'  => 'integer',
-        'width'     => 'integer',
-        'height'    => 'integer',
+        'duration' => 'integer',
+        'width' => 'integer',
+        'height' => 'integer',
     ];
 
     // ── Helpers ────────────────────────────────────────────────
@@ -72,6 +72,6 @@ class Attachment extends Model
             $i++;
         }
 
-        return round($bytes, 2) . ' ' . $units[$i];
+        return round($bytes, 2).' '.$units[$i];
     }
 }

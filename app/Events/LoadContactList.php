@@ -4,7 +4,6 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -17,9 +16,10 @@ class LoadContactList implements ShouldBroadcastNow
     /**
      * Create a new event instance.
      */
-
     public $senderId;
+
     public $recieverId;
+
     public function __construct($senderId, $recieverId)
     {
         $this->senderId = $senderId;
@@ -34,7 +34,7 @@ class LoadContactList implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('user.' . $this->senderId),
+            new PrivateChannel('user.'.$this->senderId),
         ];
     }
 

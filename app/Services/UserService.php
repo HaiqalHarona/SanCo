@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Conversation;
 use App\Models\User;
+use FurqanSiddiqui\BIP39\BIP39;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use FurqanSiddiqui\BIP39\BIP39;
 
 class UserService
 {
@@ -29,6 +30,7 @@ class UserService
         if ($val !== null) {
             Cache::forever($cacheKey, $val);
         }
+
         return $val;
     }
 
@@ -45,14 +47,14 @@ class UserService
 
     public function updateAvatar(string $userId, string $base64Image): string
     {
-        if (!preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+        if (! preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
             throw new \Exception('Invalid image format');
         }
 
         $data = substr($base64Image, strpos($base64Image, ',') + 1);
         $type = strtolower($type[1]);
 
-        if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+        if (! in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
             throw new \Exception('Invalid image type');
         }
 
@@ -61,14 +63,14 @@ class UserService
             throw new \Exception('base64_decode failed');
         }
 
-        if (!Storage::disk('public')->exists('avatars')) {
+        if (! Storage::disk('public')->exists('avatars')) {
             Storage::disk('public')->makeDirectory('avatars');
         }
 
-        $filename = Str::random(40) . '.' . $type;
-        Storage::disk('public')->put('avatars/' . $filename, $data);
+        $filename = Str::random(40).'.'.$type;
+        Storage::disk('public')->put('avatars/'.$filename, $data);
 
-        $url = asset('storage/avatars/' . $filename);
+        $url = asset('storage/avatars/'.$filename);
 
         User::where('_id', $userId)->update(['avatar' => $url]);
 
@@ -85,11 +87,15 @@ class UserService
         Cache::forget("sanco:user:{$userId}:profile");
 
         // Bust all conversation participant key caches that this user is part of
-        $convIds = \App\Models\Conversation::where('participant_ids', $userId)->pluck('_id');
-        foreach ($convIds as $convId) {
-            Cache::forget("sanco:conv:{$convId}:public_keys");
-            Cache::forget("sanco:conv:{$convId}:details");
-        }
+        $userIdStr = (string) $userId;
+        Conversation::all()->each(function ($conv) use ($userIdStr) {
+            $pids = collect($conv->participant_ids ?? [])->map(fn ($id) => (string) $id);
+            if ($pids->contains($userIdStr)) {
+                $idStr = (string) $conv->_id;
+                Cache::forget("sanco:conv:{$idStr}:public_keys");
+                Cache::forget("sanco:conv:{$idStr}:details");
+            }
+        });
     }
 
     public function rotateKey(string $userId): string
@@ -102,11 +108,15 @@ class UserService
         Cache::forget("sanco:user:{$userId}:public_key");
 
         // Bust all conversation participant key caches that this user is part of
-        $convIds = \App\Models\Conversation::where('participant_ids', $userId)->pluck('_id');
-        foreach ($convIds as $convId) {
-            Cache::forget("sanco:conv:{$convId}:public_keys");
-            Cache::forget("sanco:conv:{$convId}:details");
-        }
+        $userIdStr = (string) $userId;
+        Conversation::all()->each(function ($conv) use ($userIdStr) {
+            $pids = collect($conv->participant_ids ?? [])->map(fn ($id) => (string) $id);
+            if ($pids->contains($userIdStr)) {
+                $idStr = (string) $conv->_id;
+                Cache::forget("sanco:conv:{$idStr}:public_keys");
+                Cache::forget("sanco:conv:{$idStr}:details");
+            }
+        });
 
         return $masterKey;
     }

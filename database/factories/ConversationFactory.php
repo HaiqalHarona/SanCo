@@ -35,10 +35,11 @@ class ConversationFactory extends Factory
     {
         return $this->state(function (array $attributes) use ($name) {
             $groupName = $name ?? $this->faker->words(3, true);
+
             return [
                 'type' => 'group',
                 'name' => ucwords($groupName),
-                'avatar' => 'https://ui-avatars.com/api/?name=' . urlencode($groupName) . '&background=random&color=fff',
+                'avatar' => 'https://ui-avatars.com/api/?name='.urlencode($groupName).'&background=random&color=fff',
             ];
         });
     }

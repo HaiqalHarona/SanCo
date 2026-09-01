@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\Message;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class MessageFactory extends Factory
 {
@@ -43,7 +42,7 @@ class MessageFactory extends Factory
                 'image/jpeg' => 'jpg',
                 'application/pdf' => 'pdf',
                 'audio/mpeg' => 'mp3',
-                'video/mp4' => 'mp4'
+                'video/mp4' => 'mp4',
             ];
             $type = explode('/', $mime)[0];
             if ($type === 'application') {
@@ -54,7 +53,7 @@ class MessageFactory extends Factory
                 'type' => $type,
                 'attachments' => [
                     [
-                        'file_name' => $this->faker->word() . '.' . $exts[$mime],
+                        'file_name' => $this->faker->word().'.'.$exts[$mime],
                         'file_size' => $this->faker->numberBetween(1024, 10485760),
                         'mime_type' => $mime,
                         'url' => 'https://picsum.photos/800/600',
@@ -62,9 +61,24 @@ class MessageFactory extends Factory
                         'duration' => in_array($type, ['audio', 'video']) ? $this->faker->numberBetween(10, 300) : null,
                         'width' => in_array($type, ['image', 'video']) ? 1280 : null,
                         'height' => in_array($type, ['image', 'video']) ? 720 : null,
-                    ]
-                ]
+                    ],
+                ],
             ];
         });
+    }
+
+    /**
+     * Indicate that the message is end-to-end encrypted.
+     */
+    public function encrypted(?string $nonce = null, ?array $encKeys = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => 'text',
+            'metadata' => [
+                'is_encrypted' => true,
+                'nonce' => $nonce ?? base64_encode(random_bytes(24)),
+                'enc_keys' => $encKeys ?? ['mock_recipient' => base64_encode(random_bytes(32))],
+            ],
+        ]);
     }
 }

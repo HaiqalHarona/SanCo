@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\User;
 use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
 
 class MessageReactionTest extends TestCase
 {
@@ -79,7 +79,7 @@ class MessageReactionTest extends TestCase
             'emoji' => '👍',
         ]);
         $response->assertStatus(200)
-                 ->assertJson(['message' => 'Reaction added.']);
+            ->assertJson(['message' => 'Reaction added.']);
 
         $message->refresh();
         $this->assertCount(1, $message->reactions);
@@ -104,7 +104,7 @@ class MessageReactionTest extends TestCase
                 [
                     'user_id' => $otherUser->_id,
                     'emoji' => '👍',
-                ]
+                ],
             ],
         ]);
 
@@ -116,7 +116,7 @@ class MessageReactionTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-                 ->assertJson(['message' => 'Reaction added.']);
+            ->assertJson(['message' => 'Reaction added.']);
 
         $message->refresh();
         $this->assertCount(1, $message->reactions);
@@ -140,7 +140,7 @@ class MessageReactionTest extends TestCase
                 [
                     'user_id' => $otherUser->_id,
                     'emoji' => '👍',
-                ]
+                ],
             ],
         ]);
 
@@ -149,7 +149,7 @@ class MessageReactionTest extends TestCase
         $response = $this->deleteJson("/api/messages/{$message->_id}/reactions");
 
         $response->assertStatus(200)
-                 ->assertJson(['message' => 'Reaction removed.']);
+            ->assertJson(['message' => 'Reaction removed.']);
 
         $message->refresh();
         $this->assertEmpty($message->reactions);

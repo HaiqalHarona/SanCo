@@ -24,12 +24,13 @@ class ConversationService
             $allParticipantIds = $conversations->pluck('participant_ids')
                 ->flatten()
                 ->unique()
-                ->reject(fn($id) => (string) $id === (string) $user->_id);
+                ->reject(fn ($id) => (string) $id === (string) $user->_id);
 
             $users = User::whereIn('_id', $allParticipantIds)->get()->keyBy('_id');
 
             return $conversations->map(function (Conversation $convo) use ($users) {
                 $convo->display_data = $convo->getDisplayInfo($users);
+
                 return $convo;
             });
         });
@@ -48,13 +49,13 @@ class ConversationService
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             // Check if there are any null values in the cached array
-            if (!in_array(null, $cached, true)) {
+            if (! in_array(null, $cached, true)) {
                 return $cached;
             }
         }
 
         $convo = Conversation::find($convId);
-        if (!$convo) {
+        if (! $convo) {
             return [];
         }
 
@@ -66,7 +67,7 @@ class ConversationService
         })->toArray();
 
         // Only cache if there are no null keys (i.e. all participants have keys set)
-        if (!in_array(null, $keys, true) && !empty($keys)) {
+        if (! in_array(null, $keys, true) && ! empty($keys)) {
             Cache::put($cacheKey, $keys, now()->addMinutes(30));
         }
 
@@ -77,9 +78,10 @@ class ConversationService
     {
         return Cache::remember("sanco:conv:{$convId}:participants", now()->addHour(), function () use ($convId) {
             $convo = Conversation::find($convId);
-            if (!$convo) {
+            if (! $convo) {
                 return collect();
             }
+
             return User::whereIn('_id', $convo->participant_ids)->get();
         });
     }
@@ -102,12 +104,12 @@ class ConversationService
     public function createGroup(string $creatorId, string $name, array $participantIds, ?string $avatar = null): Conversation
     {
         $convo = Conversation::create([
-            'type'             => 'group',
-            'name'             => $name,
-            'avatar'           => $avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=6366f1&color=fff',
-            'participant_ids'  => $participantIds,
+            'type' => 'group',
+            'name' => $name,
+            'avatar' => $avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=6366f1&color=fff',
+            'participant_ids' => $participantIds,
             'last_activity_at' => now(),
-            'created_by'       => $creatorId,
+            'created_by' => $creatorId,
         ]);
 
         foreach ($participantIds as $pid) {
@@ -142,7 +144,7 @@ class ConversationService
     public function bustInboxForParticipants(string $convId): void
     {
         $convo = Conversation::find($convId);
-        if (!$convo) {
+        if (! $convo) {
             return;
         }
 

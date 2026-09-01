@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
 use App\Models\Friendship;
+use App\Models\User;
 use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
 
 class FriendshipBlockTest extends TestCase
 {
@@ -58,7 +58,7 @@ class FriendshipBlockTest extends TestCase
         $response = $this->postJson("/api/friends/{$friend->_id}/block");
 
         $response->assertStatus(200)
-                 ->assertJson(['message' => 'User blocked.']);
+            ->assertJson(['message' => 'User blocked.']);
 
         // Assert friendship records are deleted, and a block record is created
         $this->assertFalse(Friendship::areFriends($user->_id, $friend->_id));
@@ -87,7 +87,7 @@ class FriendshipBlockTest extends TestCase
         $response = $this->deleteJson("/api/friends/{$blocked->_id}/unblock");
 
         $response->assertStatus(200)
-                 ->assertJson(['message' => 'User unblocked.']);
+            ->assertJson(['message' => 'User unblocked.']);
 
         // Assert block record is deleted
         $this->assertFalse(Friendship::hasBlocked($user->_id, $blocked->_id));

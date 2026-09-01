@@ -51,29 +51,29 @@ class MessageService
             $nonce = $metadata['nonce'] ?? null;
             $encKeys = $metadata['enc_keys'] ?? null;
 
-            if (!$isEncrypted || empty($nonce) || empty($encKeys)) {
+            if (! $isEncrypted || empty($nonce) || empty($encKeys)) {
                 throw new \InvalidArgumentException('Message body must be end-to-end encrypted (E2EE). Plaintext is rejected.');
             }
         }
 
         $message = Message::create([
             'conversation_id' => $data['conversation_id'],
-            'sender_id'       => $data['sender_id'],
-            'type'            => $type,
-            'body'            => $data['body'] ?? '',
-            'read_by'         => [
+            'sender_id' => $data['sender_id'],
+            'type' => $type,
+            'body' => $data['body'] ?? '',
+            'read_by' => [
                 [
                     'user_id' => $data['sender_id'],
                     'read_at' => now()->toISOString(),
-                ]
+                ],
             ],
             'reply_to_id' => $data['reply_to_id'] ?? null,
-            'metadata'    => $data['metadata'] ?? [],
+            'metadata' => $data['metadata'] ?? [],
         ]);
 
         // Update the conversation's last activity
         Conversation::where('_id', $data['conversation_id'])->update([
-            'last_message_id'  => $message->_id,
+            'last_message_id' => $message->_id,
             'last_activity_at' => now(),
         ]);
 

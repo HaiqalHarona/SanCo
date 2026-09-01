@@ -2,17 +2,16 @@
 
 namespace App\Models;
 
-use MongoDB\Laravel\Eloquent\Model;
-use App\Models\User;
-use App\Models\Message;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Auth;
+use MongoDB\Laravel\Eloquent\Model;
 
 class Conversation extends Model
 {
     use HasFactory;
 
     protected $connection = 'mongodb';
+
     protected $collection = 'conversations';
 
     protected $fillable = [
@@ -73,7 +72,7 @@ class Conversation extends Model
      */
     public function addParticipant(string $userId): void
     {
-        if (!in_array($userId, $this->participant_ids ?? [])) {
+        if (! in_array($userId, $this->participant_ids ?? [])) {
             $this->push('participant_ids', $userId);
         }
     }
@@ -126,28 +125,29 @@ class Conversation extends Model
         if ($this->type === 'group') {
             return [
                 'name' => $this->name ?? 'Group Chat',
-                'avatar' => $this->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($this->name ?? 'G'),
+                'avatar' => $this->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($this->name ?? 'G'),
             ];
         }
 
         // Direct Chat - Find the ID that isn't the current user
         $otherId = collect($this->participant_ids)
-            ->reject(fn($id) => (string) $id === (string) Auth::id())
+            ->reject(fn ($id) => (string) $id === (string) Auth::id())
             ->first();
 
         // Self-chat (Saved Messages)
-        if (!$otherId) {
+        if (! $otherId) {
             $user = Auth::user();
+
             return [
                 'name' => 'You (Saved Messages)',
-                'avatar' => $user->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($user->name ?? 'You'),
+                'avatar' => $user->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($user->name ?? 'You'),
             ];
         }
 
         // OPTIMIZATION: Use preloaded users if passed in, otherwise fallback to a single DB query
         $otherUser = $preloadedUsers ? $preloadedUsers->get($otherId) : User::find($otherId);
 
-        if (!$otherUser) {
+        if (! $otherUser) {
             return [
                 'name' => 'Deleted User',
                 'avatar' => 'https://ui-avatars.com/api/?name=D',
@@ -158,7 +158,7 @@ class Conversation extends Model
         return [
             'id' => (string) $otherUser->_id,
             'name' => $otherUser->name ?? 'Unknown User',
-            'avatar' => $otherUser->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($otherUser->name ?? 'U'),
+            'avatar' => $otherUser->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($otherUser->name ?? 'U'),
             'status' => $otherUser->status ?? 'offline',
         ];
     }
@@ -183,7 +183,7 @@ class Conversation extends Model
             ->first();
 
         // Create if not found
-        if (!$convo) {
+        if (! $convo) {
             $convo = static::create([
                 'type' => 'direct',
                 'participant_ids' => $participants,
@@ -196,7 +196,7 @@ class Conversation extends Model
     }
 
     /**
-     * Returns a list of conversations for the user, 
+     * Returns a list of conversations for the user,
      * including the 'Display Info' (Name/Avatar) pre-calculated.
      */
     public static function getInboxFor(User $user)
@@ -211,7 +211,7 @@ class Conversation extends Model
         $allParticipantIds = $conversations->pluck('participant_ids')
             ->flatten()
             ->unique()
-            ->reject(fn($id) => (string) $id === (string) $user->_id); // User own conversation
+            ->reject(fn ($id) => (string) $id === (string) $user->_id); // User own conversation
 
         // Get users from the conversation keyed by id in one query
         $users = User::whereIn('_id', $allParticipantIds)->get()->keyBy('_id');
@@ -219,6 +219,7 @@ class Conversation extends Model
         // Map the data and pre-load the users in the component
         return $conversations->map(function (Conversation $convo) use ($users) {
             $convo->display_data = $convo->getDisplayInfo($users);
+
             return $convo;
         });
     }

@@ -22,7 +22,7 @@ class ConversationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $inbox = $this->conversationService->getInbox($request->user());
-        
+
         $formatted = $inbox->map(function ($convo) {
             return [
                 'id' => $convo->_id,
@@ -67,6 +67,7 @@ class ConversationController extends Controller
             }
 
             $convo = $this->conversationService->findOrCreateDirect($authId, $recipientId);
+
             return response()->json([
                 'message' => 'Direct conversation resolved.',
                 'conversation_id' => $convo->_id,
@@ -74,7 +75,7 @@ class ConversationController extends Controller
         } else {
             $pids = $request->input('participant_ids');
             // Ensure creator is in participants list
-            if (!in_array($authId, $pids)) {
+            if (! in_array($authId, $pids)) {
                 $pids[] = $authId;
             }
 
@@ -97,12 +98,12 @@ class ConversationController extends Controller
     public function show(string $id, Request $request): JsonResponse
     {
         $convo = $this->conversationService->getConversation($id);
-        if (!$convo) {
+        if (! $convo) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         // Authorization check: Is user a participant?
-        if (!in_array($request->user()->_id, $convo->participant_ids)) {
+        if (! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404); // Hide existence (per safety rules)
         }
 
@@ -136,12 +137,12 @@ class ConversationController extends Controller
         ]);
 
         $convo = $this->conversationService->getConversation($id);
-        if (!$convo) {
+        if (! $convo) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         // Authorization check & check if group
-        if ($convo->type !== 'group' || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if ($convo->type !== 'group' || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -153,7 +154,7 @@ class ConversationController extends Controller
         $this->conversationService->addParticipant($id, $userId);
 
         return response()->json([
-            'message' => 'Participant added successfully.'
+            'message' => 'Participant added successfully.',
         ]);
     }
 
@@ -163,24 +164,24 @@ class ConversationController extends Controller
     public function removeParticipant(string $id, string $userId, Request $request): JsonResponse
     {
         $convo = $this->conversationService->getConversation($id);
-        if (!$convo) {
+        if (! $convo) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         // Authorization: must be group and requester must be a participant
-        if ($convo->type !== 'group' || !in_array($request->user()->_id, $convo->participant_ids)) {
+        if ($convo->type !== 'group' || ! in_array($request->user()->_id, $convo->participant_ids)) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
         // Can't remove if they aren't in it
-        if (!in_array($userId, $convo->participant_ids)) {
+        if (! in_array($userId, $convo->participant_ids)) {
             return response()->json(['error' => 'User is not a participant.'], 400);
         }
 
         $this->conversationService->removeParticipant($id, $userId);
 
         return response()->json([
-            'message' => 'Participant removed successfully.'
+            'message' => 'Participant removed successfully.',
         ]);
     }
 }

@@ -2,14 +2,16 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
-use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\FriendshipController;
+use App\Http\Controllers\Api\MessageController;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 if (config('app.allow_dev_login')) {
     Route::post('/dev-login/{id}', function ($id) {
-        $user = \App\Models\User::findOrFail($id);
+        $user = User::findOrFail($id);
         $token = $user->createToken('api-test-token')->plainTextToken;
+
         return response()->json([
             'success' => true,
             'token' => $token,
@@ -17,13 +19,13 @@ if (config('app.allow_dev_login')) {
                 'id' => (string) $user->_id,
                 'name' => $user->name,
                 'email' => $user->email,
-            ]
+            ],
         ]);
     });
 }
 
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
-    
+
     // AUTH & USER PROFILE
 
     // Retrieves details of the currently authenticated user (ID, name, email, avatar, E2EE public key)
@@ -34,7 +36,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     // Registers/updates the user's end-to-end encryption (E2EE) RSA/ECC public key in database
     Route::post('/user/keys/sync', [AuthController::class, 'syncPublicKey'])->name('api.user.keys.sync');
-
 
     // CONVERSATIONS & CHANNELS
 
@@ -53,7 +54,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // Removes a participant from a group conversation (restricted to current conversation members only)
     Route::delete('/conversations/{id}/participants/{userId}', [ConversationController::class, 'removeParticipant'])->name('api.conversations.participants.remove');
 
-
     // MESSAGES & CHAT ACTIONS
 
     // Retrieves paginated list of E2EE encrypted messages in a conversation (supports ?page and ?limit query params)
@@ -70,7 +70,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     // Removes the authenticated user's reaction from a message
     Route::delete('/messages/{id}/reactions', [MessageController::class, 'unreact'])->name('api.messages.unreact');
-
 
     // FRIENDSHIPS & RELATIONSHIPS
 

@@ -2,10 +2,10 @@
 
 namespace App\Livewire\MessengerVolt;
 
+use App\Events\MessageSent;
 use App\Services\ConversationService;
 use App\Services\MessageService;
 use App\Services\UserService;
-use App\Events\MessageSent;
 use Livewire\Attributes\Computed;
 
 trait MessagingActions
@@ -14,7 +14,7 @@ trait MessagingActions
 
     public function selectConversation($id, $userId = null)
     {
-        if (!$id && $userId) {
+        if (! $id && $userId) {
             $convo = app(ConversationService::class)->findOrCreateDirect(auth()->id(), $userId);
             $this->selectedConversationId = (string) $convo->_id;
         } else {
@@ -27,7 +27,7 @@ trait MessagingActions
     #[Computed]
     public function selectedConversation()
     {
-        if (!$this->selectedConversationId) {
+        if (! $this->selectedConversationId) {
             return null;
         }
 
@@ -50,10 +50,10 @@ trait MessagingActions
 
     public function messageUser($encryptedBody = null, $nonce = null, $encryptedKeys = null)
     {
-        if (!auth()->user()->master_key) {
+        if (! auth()->user()->master_key) {
             return;
         }
-        if (!$this->selectedConversationId) {
+        if (! $this->selectedConversationId) {
             return;
         }
 
@@ -70,7 +70,7 @@ trait MessagingActions
             'metadata' => [
                 'nonce' => $nonce,
                 'enc_keys' => $encryptedKeys,
-                'is_encrypted' => !!$encryptedKeys,
+                'is_encrypted' => (bool) $encryptedKeys,
             ],
         ]);
 
@@ -93,7 +93,7 @@ trait MessagingActions
 
     public function getParticipantKeys(): array
     {
-        if (!$this->selectedConversationId) {
+        if (! $this->selectedConversationId) {
             return [];
         }
 
