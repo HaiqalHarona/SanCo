@@ -8,28 +8,28 @@ SanCo is a modern, high-fidelity real-time messaging application designed with p
 
 To navigate the technical details of the SanCo ecosystem, refer to the following specialized documentation guides:
 
-### [End-to-End Encryption Specification](ENCRYPTION.md)
+### [End-to-End Encryption Specification](docs/encryption.md)
 Detailed specification of the zero-knowledge security model and browser cryptography:
-*   [Cryptographic Primitives & Tech Stack](ENCRYPTION.md#1-cryptographic-primitives--technology-stack) (libsodium, BIP39, Curve25519, XSalsa20-Poly1305)
-*   [Key Management & Storage Architecture](ENCRYPTION.md#2-key-management--storage-architecture) (Derivation logic, sessionStorage/localStorage lifetimes, scrubbing)
-*   [The Envelope Encryption Lifecycle](ENCRYPTION.md#3-the-envelope-encryption-lifecycle) (Encryption/decryption, key wrapping/unwrapping)
-*   [Security Architecture Highlights](ENCRYPTION.md#4-security-architecture-highlights) (Zero-knowledge, session separation, rotation, hijack prevention)
-*   [Key Synchronization & Multi-Platform Login](ENCRYPTION.md#5-key-synchronization--multi-platform-login-workflow) (Single-session enforcement, sync lifecycle, constraint warnings)
+*   [Cryptographic Primitives & Tech Stack](docs/encryption.md#1-cryptographic-primitives--technology-stack) (libsodium, BIP39, Curve25519, XSalsa20-Poly1305)
+*   [Key Management & Storage Architecture](docs/encryption.md#2-key-management--storage-architecture) (Derivation logic, sessionStorage/localStorage lifetimes, scrubbing)
+*   [The Envelope Encryption Lifecycle](docs/encryption.md#3-the-envelope-encryption-lifecycle) (Encryption/decryption, key wrapping/unwrapping)
+*   [Security Architecture Highlights](docs/encryption.md#4-security-architecture-highlights) (Zero-knowledge, session separation, rotation, hijack prevention)
+*   [Key Synchronization & Multi-Platform Login](docs/encryption.md#5-key-synchronization--multi-platform-login-workflow) (Single-session enforcement, sync lifecycle, constraint warnings)
 
-### [Database Schema & Architecture](relationship_diagram.md)
+### [Database Schema & Architecture](docs/relationship_diagram.md)
 Comprehensive design of the database collections, model relationships, and API blueprints:
-*   [Entity Relationship Diagram](relationship_diagram.md#entity-relationship-diagram) (Mermaid visualization of User, Conversation, Message, Friendship collections)
-*   [Model Relationships & Functions](relationship_diagram.md#model-relationships--functions) (API/Helpers for User, Conversation, Message, Attachment, Friendship models)
-*   [Database Architecture & MongoDB Patterns](relationship_diagram.md#database-architecture-overview) (Embedded arrays, atomic operations, symmetric/reciprocal friendships)
-*   [Mobile API Routes Proposal](relationship_diagram.md#proposed-mobile-api-routes-routesapiphp) (Sanctum authentication, keys, conversations, messaging, friendships endpoints)
+*   [Entity Relationship Diagram](docs/relationship_diagram.md#entity-relationship-diagram) (Mermaid visualization of User, Conversation, Message, Friendship collections)
+*   [Model Relationships & Functions](docs/relationship_diagram.md#model-relationships--functions) (API/Helpers for User, Conversation, Message, Attachment, Friendship models)
+*   [Database Architecture & MongoDB Patterns](docs/relationship_diagram.md#database-architecture-overview) (Embedded arrays, atomic operations, symmetric/reciprocal friendships)
+*   [Mobile API Routes Proposal](docs/relationship_diagram.md#proposed-mobile-api-routes-routesapiphp) (Sanctum authentication, keys, conversations, messaging, friendships endpoints)
 
-### [REST API Reference](api.md)
+### [REST API Reference](docs/api.md)
 Technical API testing instructions and JSON request/response schema specifications:
-*   [Global Setup & Headers Presets](api.md#global-setup) (Authorization, content type, environment variables)
-*   [Authentication & Profile Endpoints](api.md#1-authentication--user-profile) (GET /user, PUT /user/profile, POST /user/keys/sync)
-*   [Conversations & Channels Endpoints](api.md#2-conversations--channels) (GET /conversations, POST /conversations, adding/removing participants)
-*   [Messages & E2EE Exchange Endpoints](api.md#3-messages--e2ee-exchange) (Sending encrypted payloads, read-receipts, reaction management)
-*   [Friendships & Contacts Endpoints](api.md#4-friendships--contacts) (Requests, accept/reject, unfriend, blocking/unblocking)
+*   [Global Setup & Headers Presets](docs/api.md#global-setup) (Authorization, content type, environment variables)
+*   [Authentication & Profile Endpoints](docs/api.md#1-authentication--user-profile) (GET /user, PUT /user/profile, POST /user/keys/sync)
+*   [Conversations & Channels Endpoints](docs/api.md#2-conversations--channels) (GET /conversations, POST /conversations, adding/removing participants)
+*   [Messages & E2EE Exchange Endpoints](docs/api.md#3-messages--e2ee-exchange) (Sending encrypted payloads, read-receipts, reaction management)
+*   [Friendships & Contacts Endpoints](docs/api.md#4-friendships--contacts) (Requests, accept/reject, unfriend, blocking/unblocking)
 
 ---
 
@@ -139,9 +139,11 @@ Below are the key files and folders in the codebase:
 │               ├── pending-requests-overlay.blade.php  # Mutual friend request modal
 │               └── settings-overlay.blade.php          # User profile settings & key regenerator
 │
-├── ENCRYPTION.md                              # Deep-dive documentation on E2EE mechanisms
-├── relationship_diagram.md                     # Entity-relationship and schema definitions
-└── api.md                                     # REST API reference and testing suite
+├── docs/
+│   ├── api.md                                     # REST API reference and testing suite
+│   ├── encryption.md                              # Deep-dive documentation on E2EE mechanisms
+│   └── relationship_diagram.md                     # Entity-relationship and schema definitions
+└── README.md                                      # Project overview and quickstart
 ```
 
 ---
@@ -150,9 +152,9 @@ Below are the key files and folders in the codebase:
 
 To help understand the database architecture, security designs, and backend APIs:
 
-*   [End-to-End Encryption Specification (ENCRYPTION.md)](ENCRYPTION.md) — Architectural overview of sodium-based browser cryptography and key distribution.
-*   [Database Entity Relationship & Schema Details (relationship_diagram.md)](relationship_diagram.md) — MongoDB collection designs, relationships, and caching strategies.
-*   [REST API Reference (api.md)](api.md) — HTTP API endpoints overview and testing details.
+*   [End-to-End Encryption Specification (docs/encryption.md)](docs/encryption.md) — Architectural overview of sodium-based browser cryptography and key distribution.
+*   [Database Entity Relationship & Schema Details (docs/relationship_diagram.md)](docs/relationship_diagram.md) — MongoDB collection designs, relationships, and caching strategies.
+*   [REST API Reference (docs/api.md)](docs/api.md) — HTTP API endpoints overview and testing details.
 
 ---
 
@@ -207,4 +209,4 @@ composer run dev
 
 ## Security Auditing
 
-For a deep-dive security breakdown and cryptographic specifications of our end-to-end encryption, check out the [ENCRYPTION.md](ENCRYPTION.md) file.
+For a deep-dive security breakdown and cryptographic specifications of our end-to-end encryption, check out the [docs/encryption.md](docs/encryption.md) file.
