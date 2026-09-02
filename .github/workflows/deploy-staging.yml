@@ -45,13 +45,16 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
+      - name: Prepare Environment and Directories
+        run: |
+          mkdir -p storage/framework/{cache/data,sessions,views} storage/logs bootstrap/cache
+          cp .env.example .env
+
       - name: Install Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
-      - name: Prepare Environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate
+      - name: Generate App Key
+        run: php artisan key:generate
 
       - name: Run Backend Tests
         env:

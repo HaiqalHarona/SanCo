@@ -8,28 +8,35 @@ SanCo is a modern, high-fidelity real-time messaging application designed with p
 
 To navigate the technical details of the SanCo ecosystem, refer to the following specialized documentation guides:
 
-### [End-to-End Encryption Specification](docs/encryption.md)
+### [End-to-End Encryption Specification](docs/ENCRYPTION.md)
 Detailed specification of the zero-knowledge security model and browser cryptography:
-*   [Cryptographic Primitives & Tech Stack](docs/encryption.md#1-cryptographic-primitives--technology-stack) (libsodium, BIP39, Curve25519, XSalsa20-Poly1305)
-*   [Key Management & Storage Architecture](docs/encryption.md#2-key-management--storage-architecture) (Derivation logic, sessionStorage/localStorage lifetimes, scrubbing)
-*   [The Envelope Encryption Lifecycle](docs/encryption.md#3-the-envelope-encryption-lifecycle) (Encryption/decryption, key wrapping/unwrapping)
-*   [Security Architecture Highlights](docs/encryption.md#4-security-architecture-highlights) (Zero-knowledge, session separation, rotation, hijack prevention)
-*   [Key Synchronization & Multi-Platform Login](docs/encryption.md#5-key-synchronization--multi-platform-login-workflow) (Single-session enforcement, sync lifecycle, constraint warnings)
+*   [Cryptographic Primitives & Tech Stack](docs/ENCRYPTION.md#1-cryptographic-primitives--technology-stack) (libsodium, BIP39, Curve25519, XSalsa20-Poly1305)
+*   [Key Management & Storage Architecture](docs/ENCRYPTION.md#2-key-management--storage-architecture) (Derivation logic, sessionStorage/localStorage lifetimes, scrubbing)
+*   [The Envelope Encryption Lifecycle](docs/ENCRYPTION.md#3-the-envelope-encryption-lifecycle) (Encryption/decryption, key wrapping/unwrapping)
+*   [Security Architecture Highlights](docs/ENCRYPTION.md#4-security-architecture-highlights) (Zero-knowledge, session separation, rotation, hijack prevention)
+*   [Key Synchronization & Multi-Platform Login](docs/ENCRYPTION.md#5-key-synchronization--multi-platform-login-workflow) (Single-session enforcement, sync lifecycle, constraint warnings)
 
-### [Database Schema & Architecture](docs/relationship_diagram.md)
+### [Database Schema & Architecture](docs/RELATIONSHIP.md)
 Comprehensive design of the database collections, model relationships, and API blueprints:
-*   [Entity Relationship Diagram](docs/relationship_diagram.md#entity-relationship-diagram) (Mermaid visualization of User, Conversation, Message, Friendship collections)
-*   [Model Relationships & Functions](docs/relationship_diagram.md#model-relationships--functions) (API/Helpers for User, Conversation, Message, Attachment, Friendship models)
-*   [Database Architecture & MongoDB Patterns](docs/relationship_diagram.md#database-architecture-overview) (Embedded arrays, atomic operations, symmetric/reciprocal friendships)
-*   [Mobile API Routes Proposal](docs/relationship_diagram.md#proposed-mobile-api-routes-routesapiphp) (Sanctum authentication, keys, conversations, messaging, friendships endpoints)
+*   [Entity Relationship Diagram](docs/RELATIONSHIP.md#entity-relationship-diagram) (Mermaid visualization of User, Conversation, Message, Friendship collections)
+*   [Model Relationships & Functions](docs/RELATIONSHIP.md#model-relationships--functions) (API/Helpers for User, Conversation, Message, Attachment, Friendship models)
+*   [Database Architecture & MongoDB Patterns](docs/RELATIONSHIP.md#database-architecture-overview) (Embedded arrays, atomic operations, symmetric/reciprocal friendships)
+*   [Mobile API Routes Proposal](docs/RELATIONSHIP.md#proposed-mobile-api-routes-routesapiphp) (Sanctum authentication, keys, conversations, messaging, friendships endpoints)
 
-### [REST API Reference](docs/api.md)
+### [REST API Reference](docs/API.md)
 Technical API testing instructions and JSON request/response schema specifications:
-*   [Global Setup & Headers Presets](docs/api.md#global-setup) (Authorization, content type, environment variables)
-*   [Authentication & Profile Endpoints](docs/api.md#1-authentication--user-profile) (GET /user, PUT /user/profile, POST /user/keys/sync)
-*   [Conversations & Channels Endpoints](docs/api.md#2-conversations--channels) (GET /conversations, POST /conversations, adding/removing participants)
-*   [Messages & E2EE Exchange Endpoints](docs/api.md#3-messages--e2ee-exchange) (Sending encrypted payloads, read-receipts, reaction management)
-*   [Friendships & Contacts Endpoints](docs/api.md#4-friendships--contacts) (Requests, accept/reject, unfriend, blocking/unblocking)
+*   [Global Setup & Headers Presets](docs/API.md#global-setup) (Authorization, content type, environment variables)
+*   [Authentication & Profile Endpoints](docs/API.md#1-authentication--user-profile) (GET /user, PUT /user/profile, POST /dev-login)
+*   [Conversations & Channels Endpoints](docs/API.md#2-conversations--channels) (GET /conversations, POST /conversations, adding/removing participants)
+*   [Messages & E2EE Exchange Endpoints](docs/API.md#3-messages--e2ee-exchange) (Sending encrypted payloads, read-receipts, reaction management)
+*   [Friendships & Contacts Endpoints](docs/API.md#4-friendships--contacts) (Requests, accept/reject, unfriend, blocking/unblocking)
+
+### [GitHub Actions CI/CD Pipeline](docs/GITHUB_ACTIONS.md)
+Automated testing, continuous integration, and SSH zero-downtime deployment pipelines:
+*   [Pipeline Architecture Overview](docs/GITHUB_ACTIONS.md#1-pipeline-architecture-overview) (Continuous integration, staging, and production flows)
+*   [Branching & Deployment Strategy](docs/GITHUB_ACTIONS.md#2-branching--deployment-strategy) (Develop, Alpha, Main, and release tags)
+*   [Workflow Specifications](docs/GITHUB_ACTIONS.md#3-workflow-specifications) (Pint code style, PHP 8.4 + MongoDB + Redis test suite, Node 22 build check)
+*   [Required GitHub Secrets](docs/GITHUB_ACTIONS.md#5-required-github-secrets--configuration) (Staging & Production SSH deployment configuration)
 
 ---
 
@@ -140,9 +147,10 @@ Below are the key files and folders in the codebase:
 │               └── settings-overlay.blade.php          # User profile settings & key regenerator
 │
 ├── docs/
-│   ├── api.md                                     # REST API reference and testing suite
-│   ├── encryption.md                              # Deep-dive documentation on E2EE mechanisms
-│   └── relationship_diagram.md                     # Entity-relationship and schema definitions
+│   ├── API.md                                     # REST API reference and testing suite
+│   ├── ENCRYPTION.md                              # Deep-dive documentation on E2EE mechanisms
+│   ├── GITHUB_ACTIONS.md                          # GitHub Actions CI/CD workflows and deployment guide
+│   └── RELATIONSHIP.md                            # Entity-relationship and schema definitions
 └── README.md                                      # Project overview and quickstart
 ```
 
@@ -150,11 +158,12 @@ Below are the key files and folders in the codebase:
 
 ## Documentation & Reference Guides
 
-To help understand the database architecture, security designs, and backend APIs:
+To help understand the database architecture, security designs, backend APIs, and deployment pipelines:
 
-*   [End-to-End Encryption Specification (docs/encryption.md)](docs/encryption.md) — Architectural overview of sodium-based browser cryptography and key distribution.
-*   [Database Entity Relationship & Schema Details (docs/relationship_diagram.md)](docs/relationship_diagram.md) — MongoDB collection designs, relationships, and caching strategies.
-*   [REST API Reference (docs/api.md)](docs/api.md) — HTTP API endpoints overview and testing details.
+*   [End-to-End Encryption Specification (docs/ENCRYPTION.md)](docs/ENCRYPTION.md) — Architectural overview of sodium-based browser cryptography and key distribution.
+*   [Database Entity Relationship & Schema Details (docs/RELATIONSHIP.md)](docs/RELATIONSHIP.md) — MongoDB collection designs, relationships, and caching strategies.
+*   [REST API Reference (docs/API.md)](docs/API.md) — HTTP API endpoints overview and testing details.
+*   [GitHub Actions CI/CD Pipeline (docs/GITHUB_ACTIONS.md)](docs/GITHUB_ACTIONS.md) — CI automated testing, staging, and production deployment specifications.
 
 ---
 
@@ -209,4 +218,4 @@ composer run dev
 
 ## Security Auditing
 
-For a deep-dive security breakdown and cryptographic specifications of our end-to-end encryption, check out the [docs/encryption.md](docs/encryption.md) file.
+For a deep-dive security breakdown and cryptographic specifications of our end-to-end encryption, check out the [docs/ENCRYPTION.md](docs/ENCRYPTION.md) file.
