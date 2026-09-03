@@ -2,7 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ develop, 'feature/**' ]
   pull_request:
     branches: [ develop, alpha, main ]
 
@@ -102,6 +102,28 @@ jobs:
           REDIS_PORT: 6379
           CACHE_STORE: redis
         run: php artisan test
+
+      - name: Seed Database for Stress Testing
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+          MONGODB_URI: "mongodb://127.0.0.1:27017"
+          MONGODB_DATABASE: "testing"
+        run: php artisan db:seed --force
+
+      - name: Run Query Stress Benchmark
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+          MONGODB_URI: "mongodb://127.0.0.1:27017"
+          MONGODB_DATABASE: "testing"
+          REDIS_CLIENT: phpredis
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          CACHE_STORE: redis
+        run: php tests/stress/query.php
 
   build-frontend:
     name: Frontend Build Check

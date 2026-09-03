@@ -18,12 +18,8 @@ class ConcurrentLoginTest extends TestCase
         User::truncate();
         Conversation::truncate();
         Cache::store('array')->flush();
-        // Clear any leftover Redis session keys from previous test runs
-        try {
-            Redis::connection('default')->flushDb();
-        } catch (\Throwable $e) {
-            // Redis not available locally; tests that need it will be skipped.
-        }
+        Redis::connection('default')->flushDb();
+        Redis::connection('cache')->flushDb();
     }
 
     /**
@@ -31,11 +27,7 @@ class ConcurrentLoginTest extends TestCase
      */
     public function test_single_active_session_is_not_kicked()
     {
-        try {
-            Redis::connection('default')->ping();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        Redis::connection('default')->ping();
 
         $user = User::factory()->create();
         $service = app(UserService::class);
@@ -56,11 +48,7 @@ class ConcurrentLoginTest extends TestCase
      */
     public function test_concurrent_login_kicks_out_old_session()
     {
-        try {
-            Redis::connection('default')->ping();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        Redis::connection('default')->ping();
 
         $user = User::factory()->create();
         $service = app(UserService::class);
@@ -89,11 +77,7 @@ class ConcurrentLoginTest extends TestCase
      */
     public function test_logout_clears_redis_session()
     {
-        try {
-            Redis::connection('default')->ping();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        Redis::connection('default')->ping();
 
         $user = User::factory()->create();
         $service = app(UserService::class);
@@ -111,11 +95,7 @@ class ConcurrentLoginTest extends TestCase
      */
     public function test_new_login_overwrites_old_session_in_redis()
     {
-        try {
-            Redis::connection('default')->ping();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        Redis::connection('default')->ping();
 
         $user = User::factory()->create();
         $service = app(UserService::class);
@@ -132,11 +112,10 @@ class ConcurrentLoginTest extends TestCase
      */
     public function test_session_ttl_is_two_hours()
     {
-        try {
-            Redis::connection('default')->ping();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        Redis::connection('default')->ping();
+
+        config(['cache.default' => 'redis']);
+        Cache::forgetDriver('redis');
 
         $user = User::factory()->create();
         $service = app(UserService::class);
@@ -145,9 +124,12 @@ class ConcurrentLoginTest extends TestCase
 
         $service->setSession($userId, 'ttl_session');
 
-        $ttl = Redis::connection('default')->ttl($key);
-        // Allow a 5-second window for test execution
-        $this->assertGreaterThan(7195, $ttl);
+        $redisStore = Cache::store('redis');
+        $fullKey = $redisStore->getPrefix().$key;
+        $ttl = $redisStore->connection()->ttl($fullKey);
+
+        // Allow a 10-second window for test execution
+        $this->assertGreaterThan(7190, $ttl);
         $this->assertLessThanOrEqual(7200, $ttl);
     }
 }

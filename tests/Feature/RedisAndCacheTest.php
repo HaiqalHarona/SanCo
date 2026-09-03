@@ -8,6 +8,7 @@ use App\Services\UserService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
+use Illuminate\Support\Facades\Config;
 
 class RedisAndCacheTest extends TestCase
 {
@@ -23,13 +24,9 @@ class RedisAndCacheTest extends TestCase
      */
     public function test_redis_default_connection_ping()
     {
-        try {
-            $pong = Redis::connection('default')->ping();
-            // phpredis returns true; predis returns '+PONG'
-            $this->assertTrue($pong === true || $pong === '+PONG' || strtolower((string) $pong) === 'pong');
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        $pong = Redis::connection('default')->ping();
+        // phpredis returns true; predis returns '+PONG'
+        $this->assertTrue($pong === true || $pong === '+PONG' || strtolower((string) $pong) === 'pong');
     }
 
     /**
@@ -37,19 +34,15 @@ class RedisAndCacheTest extends TestCase
      */
     public function test_redis_cache_connection_set_get_delete()
     {
-        try {
-            $conn = Redis::connection('cache');
-            $key = 'sanco_test_key_'.uniqid();
-            $conn->set($key, 'hello_sanco');
+        $conn = Redis::connection('cache');
+        $key = 'sanco_test_key_'.uniqid();
+        $conn->set($key, 'hello_sanco');
 
-            $this->assertEquals('hello_sanco', $conn->get($key));
+        $this->assertEquals('hello_sanco', $conn->get($key));
 
-            $conn->del($key);
+        $conn->del($key);
 
-            $this->assertNull($conn->get($key));
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
+        $this->assertNull($conn->get($key));
     }
 
     /**
@@ -138,12 +131,6 @@ class RedisAndCacheTest extends TestCase
      */
     public function test_session_store_get_and_forget()
     {
-        try {
-            Redis::connection('default')->ping();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('Redis not available: '.$e->getMessage());
-        }
-
         $user = User::factory()->create();
         $service = app(UserService::class);
         $userId = (string) $user->_id;

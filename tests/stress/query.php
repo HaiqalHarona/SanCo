@@ -1,16 +1,16 @@
 <?php
 
-// Bootstrap Laravel from root directory
-require __DIR__.'/../../vendor/autoload.php';
-$app = require_once __DIR__.'/../../bootstrap/app.php';
-$kernel = $app->make(Kernel::class);
-$kernel->bootstrap();
-
 use App\Models\Friendship;
 use App\Models\User;
 use App\Services\FriendshipService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Cache;
+
+// Bootstrap Laravel from root directory
+require __DIR__.'/../../vendor/autoload.php';
+$app = require_once __DIR__.'/../../bootstrap/app.php';
+$kernel = $app->make(Kernel::class);
+$kernel->bootstrap();
 
 // Clear cache before starting the test to ensure accurate first-run baseline
 Cache::clear();

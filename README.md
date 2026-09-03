@@ -32,11 +32,11 @@ Technical API testing instructions and JSON request/response schema specificatio
 *   [Friendships & Contacts Endpoints](docs/API.md#4-friendships--contacts) (Requests, accept/reject, unfriend, blocking/unblocking)
 
 ### [GitHub Actions CI/CD Pipeline](docs/GITHUB_ACTIONS.md)
-Automated testing, continuous integration, and SSH zero-downtime deployment pipelines:
-*   [Pipeline Architecture Overview](docs/GITHUB_ACTIONS.md#1-pipeline-architecture-overview) (Continuous integration, staging, and production flows)
-*   [Branching & Deployment Strategy](docs/GITHUB_ACTIONS.md#2-branching--deployment-strategy) (Develop, Alpha, Main, and release tags)
-*   [Workflow Specifications](docs/GITHUB_ACTIONS.md#3-workflow-specifications) (Pint code style, PHP 8.4 + MongoDB + Redis test suite, Node 22 build check)
-*   [Required GitHub Secrets](docs/GITHUB_ACTIONS.md#5-required-github-secrets--configuration) (Staging & Production SSH deployment configuration)
+Automated testing, continuous integration, and SSH staging deployment pipelines:
+*   [Pipeline Architecture Overview](docs/GITHUB_ACTIONS.md#1-pipeline-architecture-overview) (Continuous integration and staging deployment flows)
+*   [Branching & Deployment Strategy](docs/GITHUB_ACTIONS.md#2-branching--deployment-strategy) (Develop, Alpha, and Main branch workflows)
+*   [Test Execution in CI](docs/GITHUB_ACTIONS.md#4-test-execution-in-ci-tests) (Full Unit & Feature test suite execution across `tests/`)
+*   [Required GitHub Secrets](docs/GITHUB_ACTIONS.md#6-required-github-secrets--configuration) (Staging SSH deployment configuration)
 
 ---
 
@@ -163,7 +163,7 @@ To help understand the database architecture, security designs, backend APIs, an
 *   [End-to-End Encryption Specification (docs/ENCRYPTION.md)](docs/ENCRYPTION.md) — Architectural overview of sodium-based browser cryptography and key distribution.
 *   [Database Entity Relationship & Schema Details (docs/RELATIONSHIP.md)](docs/RELATIONSHIP.md) — MongoDB collection designs, relationships, and caching strategies.
 *   [REST API Reference (docs/API.md)](docs/API.md) — HTTP API endpoints overview and testing details.
-*   [GitHub Actions CI/CD Pipeline (docs/GITHUB_ACTIONS.md)](docs/GITHUB_ACTIONS.md) — CI automated testing, staging, and production deployment specifications.
+*   [GitHub Actions CI/CD Pipeline (docs/GITHUB_ACTIONS.md)](docs/GITHUB_ACTIONS.md) — CI automated testing (`tests/`) and staging deployment specifications.
 
 ---
 
