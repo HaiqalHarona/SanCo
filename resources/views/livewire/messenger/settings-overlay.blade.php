@@ -315,6 +315,12 @@
                         class="pb-3 border-b-2 font-bold transition-colors text-sm uppercase tracking-wider">
                         Security
                     </button>
+                    <button type="button" @click="activeTab = 'blocked'"
+                        :class="activeTab === 'blocked' ? 'text-pink-500 border-pink-500' :
+                            'text-gray-500 dark:text-[#a1a1aa] border-transparent hover:text-gray-900 dark:hover:text-white'"
+                        class="pb-3 border-b-2 font-bold transition-colors text-sm uppercase tracking-wider">
+                        Blocked Contacts
+                    </button>
                 </div>
             </div>
 
@@ -500,6 +506,46 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {{-- BLOCKED CONTACTS TAB --}}
+                <div x-show="activeTab === 'blocked'" style="display:none;"
+                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
+                    x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
+
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Blocked Contacts</h3>
+                        <p class="text-sm text-gray-500 dark:text-[#a1a1aa]">Manage contacts you have blocked. Blocked users cannot message you or see your online status.</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        @forelse($this->blockedContacts as $blockedUser)
+                            <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-2xl hover:border-pink-500/30 transition-all">
+                                <div class="flex items-center gap-4">
+                                    <img src="{{ $blockedUser->avatar ?? 'https://ui-avatars.com/api/?background=ec4899&color=fff&name=' . urlencode($blockedUser->name) }}"
+                                        alt="{{ $blockedUser->name }}" class="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-white/10">
+                                    <div>
+                                        <h4 class="text-sm font-bold text-gray-900 dark:text-white">{{ $blockedUser->name }}</h4>
+                                        <p class="text-xs text-pink-500 font-medium">{{ $blockedUser->user_tag }}</p>
+                                    </div>
+                                </div>
+                                <button type="button" wire:click="unblockUser('{{ $blockedUser->_id }}')"
+                                    class="px-4 py-2 bg-pink-500/10 hover:bg-pink-500 text-pink-500 hover:text-white text-xs font-bold rounded-xl transition-all border border-pink-500/20">
+                                    Unblock
+                                </button>
+                            </div>
+                        @empty
+                            <div class="text-center py-12 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+                                <div class="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                </div>
+                                <p class="text-sm text-gray-500 dark:text-[#a1a1aa] font-medium">No blocked contacts</p>
+                                <p class="text-xs text-gray-400 mt-1">Users you block will appear here.</p>
+                            </div>
+                        @endforelse
                     </div>
                 </div>
 

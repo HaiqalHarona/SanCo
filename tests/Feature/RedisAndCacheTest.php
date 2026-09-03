@@ -8,7 +8,6 @@ use App\Services\UserService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
-use Illuminate\Support\Facades\Config;
 
 class RedisAndCacheTest extends TestCase
 {

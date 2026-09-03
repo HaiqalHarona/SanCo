@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\SocialController;
 use App\Models\User;
+use App\Services\AttachmentStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
@@ -31,6 +32,19 @@ Route::middleware('auth')->group(function () {
 
         return response()->json(['success' => true]);
     })->name('api.save-public-key');
+
+    Route::get('/storage/attachments/{path}', function ($path) {
+        $service = app(AttachmentStorageService::class);
+        $fullPath = base64_decode($path);
+        if (! $service->exists($fullPath)) {
+            abort(404);
+        }
+
+        return response($service->getBlob($fullPath), 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    })->name('attachments.download');
 });
 
 if (config('app.allow_dev_login')) {

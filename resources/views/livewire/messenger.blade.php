@@ -679,20 +679,97 @@ new class extends Component {
                                 @endif
                             @endif
 
-                            {{-- Message Bubble containing text + inline timestamp --}}
+                            {{-- Message Bubble containing text, media attachments + inline timestamp --}}
                             <div class="group relative max-w-[80%] sm:max-w-[72%]">
-                                <div x-data="{
-                                    decryptedBody: @js($message->body),
-                                    async init() {
-                                        this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
-                                            @js($message->body),
-                                            @js($message->metadata),
-                                            @js((string) auth()->id())
-                                        );
-                                    }
-                                }"
-                                    class="px-4 py-2.5 rounded-2xl text-[14.5px] leading-[1.45] break-words transition-all shadow-sm {{ $isYou ? 'bg-purple-600 text-white rounded-br-xs' : 'bg-[#202024] text-[#e4e4e7] border border-white/5 rounded-bl-xs' }}">
-                                    <span x-text="decryptedBody">{{ $message->body }}</span>
+                                <div class="px-4 py-2.5 rounded-2xl text-[14.5px] leading-[1.45] break-words transition-all shadow-sm {{ $isYou ? 'bg-purple-600 text-white rounded-br-xs' : 'bg-[#202024] text-[#e4e4e7] border border-white/5 rounded-bl-xs' }}">
+                                    
+                                    {{-- Render Attachments --}}
+                                    @if ($message->attachments && $message->attachments->count() > 0)
+                                        <div class="space-y-2 mb-2">
+                                            @foreach ($message->attachments as $attachment)
+                                                <div x-data="{
+                                                    decryptedUrl: null,
+                                                    loading: true,
+                                                    error: false,
+                                                    showLightbox: false,
+                                                    async init() {
+                                                        try {
+                                                            this.decryptedUrl = await window.EncryptionService.decryptAttachmentForMe(
+                                                                @js($attachment->toArray()),
+                                                                @js((string) auth()->id())
+                                                            );
+                                                        } catch (e) {
+                                                            console.error('Attachment decryption failed:', e);
+                                                            this.error = true;
+                                                        } finally {
+                                                            this.loading = false;
+                                                        }
+                                                    }
+                                                }">
+                                                    {{-- Loading Skeleton --}}
+                                                    <div x-show="loading" class="w-48 h-32 bg-white/5 rounded-xl animate-pulse flex items-center justify-center">
+                                                        <span class="text-[11px] text-[#71717a]">Decrypting media...</span>
+                                                    </div>
+
+                                                    {{-- Error State --}}
+                                                    <div x-show="error" style="display:none;" class="p-2.5 bg-red-500/10 rounded-xl border border-red-500/20 text-xs text-red-400">
+                                                        Failed to decrypt attachment
+                                                    </div>
+
+                                                    {{-- Decrypted Media --}}
+                                                    <div x-show="!loading && !error" style="display:none;">
+                                                        @if ($attachment->isImage())
+                                                            <div class="relative group cursor-pointer overflow-hidden rounded-xl border border-white/10 max-w-sm">
+                                                                <img :src="decryptedUrl" @click="showLightbox = true" alt="{{ $attachment->file_name }}" class="w-full max-h-72 object-cover transition duration-200 group-hover:scale-[1.02]">
+                                                            </div>
+
+                                                            {{-- Lightbox Modal --}}
+                                                            <div x-show="showLightbox" style="display:none;" class="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4" @click.self="showLightbox = false">
+                                                                <button @click="showLightbox = false" class="absolute top-4 right-4 text-white hover:text-pink-500 transition p-2">
+                                                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                </button>
+                                                                <img :src="decryptedUrl" class="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl">
+                                                            </div>
+                                                        @elseif ($attachment->isVideo())
+                                                            <div class="rounded-xl overflow-hidden border border-white/10 max-w-md bg-black">
+                                                                <video :src="decryptedUrl" controls playsinline class="w-full max-h-80"></video>
+                                                            </div>
+                                                        @elseif ($attachment->isAudio())
+                                                            <div class="p-2 rounded-xl bg-white/5 border border-white/10 min-w-[220px]">
+                                                                <audio :src="decryptedUrl" controls class="w-full h-8"></audio>
+                                                            </div>
+                                                        @else
+                                                            <a :href="decryptedUrl" :download="@js($attachment->file_name)" class="flex items-center gap-3 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition group text-left">
+                                                                <div class="w-9 h-9 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-500 shrink-0">
+                                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                                </div>
+                                                                <div class="flex-1 min-w-0">
+                                                                    <p class="text-xs font-semibold text-white truncate">{{ $attachment->file_name }}</p>
+                                                                    <p class="text-[10px] text-[#71717a]">{{ $attachment->humanFileSize() }}</p>
+                                                                </div>
+                                                            </a>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if ($message->body && trim($message->body) !== '')
+                                        <div x-data="{
+                                            decryptedBody: @js($message->body),
+                                            async init() {
+                                                this.decryptedBody = await window.EncryptionService.decryptMessageForMe(
+                                                    @js($message->body),
+                                                    @js($message->metadata),
+                                                    @js((string) auth()->id())
+                                                );
+                                            }
+                                        }">
+                                            <span x-text="decryptedBody">{{ $message->body }}</span>
+                                        </div>
+                                    @endif
+
                                     <span
                                         x-data="{
                                             formattedTime: '',
@@ -728,206 +805,256 @@ new class extends Component {
 
             </div>
 
-            <div class="px-6 py-5 bg-[#1e1e21]/95 backdrop-blur-md border-t border-[#2a2a2d]">
-                @if ($isSelf)
-                    <div class="text-center mb-3">
-                        <span class="text-[#71717a] text-[10px] uppercase tracking-[0.2em] font-semibold">Saved
-                            Messages</span>
+            {{-- Blocked Banner or Composer Footer --}}
+            @if ($selected->is_blocked_by_me)
+                <div class="px-6 py-4 bg-amber-500/10 border-t border-amber-500/20 flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-2.5">
+                        <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        <p class="text-xs text-amber-300 font-medium">You have blocked this contact. Unblock them to send and receive messages.</p>
                     </div>
-                @endif
-                <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3"
-                    x-data="{
-                        maxSize: 10 * 1024 * 1024, // 10MB
-                        fileName: '',
-                        localBody: '',
-                        handleFile(e) {
-                            const file = e.target.files[0];
-                            if (!file) {
+                    <button type="button" wire:click="unblockUser('{{ $selected->other_user_id }}')"
+                        class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-xl transition-all shadow-md shrink-0">
+                        Unblock Contact
+                    </button>
+                </div>
+            @elseif ($selected->is_blocked_by_them)
+                <div class="px-6 py-4 bg-rose-500/10 border-t border-rose-500/20 text-center flex items-center justify-center gap-2.5">
+                    <svg class="w-5 h-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p class="text-xs text-rose-400 font-medium">You cannot send messages to this contact because you have been blocked.</p>
+                </div>
+            @else
+                <div class="px-6 py-5 bg-[#1e1e21]/95 backdrop-blur-md border-t border-[#2a2a2d]">
+                    @if ($isSelf)
+                        <div class="text-center mb-3">
+                            <span class="text-[#71717a] text-[10px] uppercase tracking-[0.2em] font-semibold">Saved Messages</span>
+                        </div>
+                    @endif
+                    <form @submit.prevent="encryptAndSend" class="relative flex items-center gap-3"
+                        x-data="{
+                            maxSize: 25 * 1024 * 1024, // 25MB
+                            selectedFile: null,
+                            fileName: '',
+                            fileSize: '',
+                            uploadProgress: 0,
+                            isUploading: false,
+                            localBody: '',
+                            handleFile(e) {
+                                const file = e.target.files[0];
+                                if (!file) {
+                                    this.removeFile();
+                                    return;
+                                }
+                                if (file.size > this.maxSize) {
+                                    alert('File size exceeds 25MB limit.');
+                                    e.target.value = '';
+                                    this.removeFile();
+                                    return;
+                                }
+                                this.selectedFile = file;
+                                this.fileName = file.name;
+                                this.fileSize = (file.size / 1024 > 1024) 
+                                    ? (file.size / (1024 * 1024)).toFixed(1) + ' MB' 
+                                    : (file.size / 1024).toFixed(0) + ' KB';
+                            },
+                            removeFile() {
+                                const input = document.getElementById('attachment-input');
+                                if (input) input.value = '';
+                                this.selectedFile = null;
                                 this.fileName = '';
-                                return;
-                            }
-                            if (file.size > this.maxSize) {
-                                alert('File size exceeds 10MB limit.');
-                                e.target.value = '';
-                                this.fileName = '';
-                                return;
-                            }
-                            this.fileName = file.name;
-                        },
-                        removeFile() {
-                            document.getElementById('attachment-input').value = '';
-                            this.fileName = '';
-                        },
-                    
-                        // ── Key Cache ────────────────────────────────────────────────────────
-                        // Participant public keys are nearly static (only change on explicit key
-                        // regeneration). Caching them in sessionStorage avoids a Livewire round-
-                        // trip + MongoDB query on every single message send.
-                        // Cache is keyed by conversationId so switching conversations is isolated.
-                        _convId: @js((string) $this->selectedConversationId ?? ''),
-                        _cacheKey() { return 'e2e_keys_' + this._convId; },
-                        _readKeyCache() {
-                            try {
-                                const v = sessionStorage.getItem(this._cacheKey());
-                                return v ? JSON.parse(v) : null;
-                            } catch { return null; }
-                        },
-                        _writeKeyCache(keys) {
-                            try { sessionStorage.setItem(this._cacheKey(), JSON.stringify(keys)); } catch (e) { console.warn('E2E: Key cache write failed:', e); }
-                        },
-                    
-                        // ── Initialization ───────────────────────────────────────────────────
-                        // The PHP selectedConversation() computed property already queries participant
-                        // public keys as part of loading the conversation — that data is available in
-                        // the Javascript rendering for free. Seed the cache from it so the first send costs nothing.
-                        init() {
-                            const renderKeys = @js($selected->participant_public_keys ?? []);
-                            if (renderKeys && Object.keys(renderKeys).length > 0) {
-                                this._writeKeyCache(renderKeys);
-                            }
-                        },
-                    
-                        // ── Main send ────────────────────────────────────────────────────────
-                        async encryptAndSend() {
-                            const body = this.localBody;
-                            if (!body || !body.trim()) return;
-                    
-                            const userId = @js((string) auth()->id());
-                            let privateKey = sessionStorage.getItem('e2e_private_' + userId);
-                            let publicKey = sessionStorage.getItem('e2e_public_' + userId);
-                    
-                            // Recover keys from mnemonic if sessionStorage is empty (new tab / session wipe)
-                            if (!privateKey || !publicKey) {
-                                const mnemonic = sessionStorage.getItem('e2e_recovery_' + userId);
-                                if (mnemonic) {
+                                this.fileSize = '';
+                                this.isUploading = false;
+                                this.uploadProgress = 0;
+                            },
+                        
+                            // ── Key Cache ────────────────────────────────────────────────────────
+                            _convId: @js((string) $this->selectedConversationId ?? ''),
+                            _cacheKey() { return 'e2e_keys_' + this._convId; },
+                            _readKeyCache() {
+                                try {
+                                    const v = sessionStorage.getItem(this._cacheKey());
+                                    return v ? JSON.parse(v) : null;
+                                } catch { return null; }
+                            },
+                            _writeKeyCache(keys) {
+                                try { sessionStorage.setItem(this._cacheKey(), JSON.stringify(keys)); } catch (e) { console.warn('E2E: Key cache write failed:', e); }
+                            },
+                        
+                            init() {
+                                const renderKeys = @js($selected->participant_public_keys ?? []);
+                                if (renderKeys && Object.keys(renderKeys).length > 0) {
+                                    this._writeKeyCache(renderKeys);
+                                }
+                            },
+                        
+                            // ── Main send ────────────────────────────────────────────────────────
+                            async encryptAndSend() {
+                                const body = this.localBody || '';
+                                if (!body.trim() && !this.selectedFile) return;
+                        
+                                const userId = @js((string) auth()->id());
+                                let privateKey = sessionStorage.getItem('e2e_private_' + userId);
+                                let publicKey = sessionStorage.getItem('e2e_public_' + userId);
+                        
+                                if (!privateKey || !publicKey) {
+                                    const mnemonic = sessionStorage.getItem('e2e_recovery_' + userId);
+                                    if (mnemonic) {
+                                        try {
+                                            const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
+                                            sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
+                                            sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
+                                            privateKey = keyPair.privateKey;
+                                            publicKey = keyPair.publicKey;
+                                            if (window._syncPublicKeyToServer) {
+                                                await window._syncPublicKeyToServer(publicKey);
+                                            }
+                                        } catch (e) {
+                                            console.error('E2E: Failed to recover keys:', e);
+                                        }
+                                    }
+                                }
+                        
+                                let keys = this._readKeyCache();
+                                let cacheComplete = keys &&
+                                    Object.keys(keys).length > 0 &&
+                                    Object.values(keys).every(k => !!k);
+
+                                if (!cacheComplete) {
                                     try {
-                                        const keyPair = await window.EncryptionService.deriveKeyPair(mnemonic);
-                                        sessionStorage.setItem('e2e_private_' + userId, keyPair.privateKey);
-                                        sessionStorage.setItem('e2e_public_' + userId, keyPair.publicKey);
-                                        privateKey = keyPair.privateKey;
-                                        publicKey = keyPair.publicKey;
-                                        if (window._syncPublicKeyToServer) {
-                                            await window._syncPublicKeyToServer(publicKey);
+                                        keys = await $wire.getParticipantKeys();
+                                        if (keys && Object.keys(keys).length > 0) {
+                                            this._writeKeyCache(keys);
                                         }
                                     } catch (e) {
-                                        console.error('E2E: Failed to recover keys:', e);
+                                        console.error('E2E: Failed to fetch participant keys:', e);
+                                        keys = keys || @js($selected->participant_public_keys ?? []);
                                     }
                                 }
-                            }
-                    
-                            // Cache-first key resolution:
-                            //   HIT  (all keys non-null) → use cache, zero server round-trips.
-                            //   MISS (cache empty or any key is null) → call getParticipantKeys(),
-                            //        write result back to cache, all future sends are free.
-                            let keys = this._readKeyCache();
-                            let cacheComplete = keys &&
-                                Object.keys(keys).length > 0 &&
-                                Object.values(keys).every(k => !!k);
-
-                            if (!cacheComplete) {
-                                console.log('E2E: Key cache miss or incomplete keys — fetching fresh keys from server.');
-                                try {
-                                    keys = await $wire.getParticipantKeys();
-                                    if (keys && Object.keys(keys).length > 0) {
-                                        this._writeKeyCache(keys);
+                        
+                                if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
+                                    if (window._syncPublicKeyToServer) {
+                                        await window._syncPublicKeyToServer(publicKey);
                                     }
-                                } catch (e) {
-                                    console.error('E2E: Failed to fetch participant keys:', e);
-                                    keys = keys || @js($selected->participant_public_keys ?? []);
+                                    keys[userId] = publicKey;
+                                    this._writeKeyCache(keys);
                                 }
-                            }
-                    
-                            // If our own key is missing from the map (e.g. previous sync failed or
-                            // key was just regenerated), inject it and push to server.
-                            if (publicKey && (!keys[userId] || keys[userId] !== publicKey)) {
-                                console.warn('E2E: Own key mismatch — syncing to server.');
-                                if (window._syncPublicKeyToServer) {
-                                    await window._syncPublicKeyToServer(publicKey);
-                                }
-                                keys[userId] = publicKey;
-                                this._writeKeyCache(keys); // keep cache consistent
-                            }
-                    
-                            const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
-                            const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
-                    
-                            if (canEncrypt) {
-                                let encResult = null;
-                                try {
-                                    console.log('E2E: Encrypting message for ' + Object.keys(keys).length + ' recipient(s)...');
-                                    encResult = await window.EncryptionService.encryptMessage(body, keys, privateKey);
-                                } catch (e) {
-                                    console.error('E2E: Encryption failed — message NOT sent.', e);
+                        
+                                const participantsMissingKeys = Object.entries(keys).filter(([id, key]) => !key);
+                                const canEncrypt = Object.keys(keys).length > 0 && privateKey && participantsMissingKeys.length === 0;
+                        
+                                if (!canEncrypt) {
                                     if (window.notyf) {
-                                        window.notyf.error('Encryption failed. Message not sent.');
+                                        window.notyf.error('Cannot send: missing encryption keys for one or more participants.');
                                     }
                                     return;
                                 }
-                    
-                                try {
-                                    await $wire.messageUser(encResult.encBody, encResult.nonce, encResult.keys);
-                                } catch (e) {
-                                    // The encrypted message was likely already saved; the error came from
-                                    // a Livewire post-send side-effect (e.g. scroll-bottom dispatch).
-                                    console.warn('E2E: Post-send Livewire error (message was saved):', e);
+
+                                let encAttachments = [];
+                                if (this.selectedFile) {
+                                    this.isUploading = true;
+                                    this.uploadProgress = 20;
+                                    try {
+                                        const fileBuffer = await this.selectedFile.arrayBuffer();
+                                        this.uploadProgress = 50;
+                                        const encFileResult = await window.EncryptionService.encryptFile(fileBuffer, keys);
+                                        this.uploadProgress = 75;
+
+                                        const storedAttachment = await $wire.uploadEncryptedAttachment({
+                                            file_name: this.selectedFile.name,
+                                            mime_type: this.selectedFile.type || 'application/octet-stream',
+                                            enc_blob_base64: encFileResult.encBlobBase64,
+                                            nonce: encFileResult.nonce,
+                                            enc_keys: encFileResult.keys,
+                                        });
+
+                                        encAttachments.push(storedAttachment);
+                                        this.uploadProgress = 100;
+                                    } catch (e) {
+                                        console.error('Attachment upload failed:', e);
+                                        if (window.notyf) window.notyf.error('Failed to encrypt/upload file.');
+                                        this.isUploading = false;
+                                        return;
+                                    }
                                 }
-                    
+                        
+                                let encResult = null;
+                                try {
+                                    encResult = await window.EncryptionService.encryptMessage(body.trim() || ' ', keys, privateKey);
+                                } catch (e) {
+                                    console.error('E2E: Encryption failed — message NOT sent.', e);
+                                    if (window.notyf) window.notyf.error('Encryption failed. Message not sent.');
+                                    this.isUploading = false;
+                                    return;
+                                }
+                        
+                                try {
+                                    await $wire.messageUser(encResult.encBody, encResult.nonce, encResult.keys, encAttachments);
+                                } catch (e) {
+                                    console.warn('E2E: Post-send Livewire error:', e);
+                                }
+                        
                                 this.localBody = '';
                                 this.removeFile();
-                            } else {
-                                console.warn('E2E: Cannot send — participant keys are missing.', {
-                                    hasPrivateKey: !!privateKey,
-                                    missingFrom: participantsMissingKeys.map(p => p[0])
-                                });
-                                if (window.notyf) {
-                                    window.notyf.error('Cannot send: missing encryption keys for one or more participants.');
-                                }
                             }
-                        }
-                    }">
-                    <fieldset class="contents" :disabled="!isUnlocked">
-                        <div>
-                            <input type="file" id="attachment-input" class="hidden" @change="handleFile">
-                            <button type="button" @click="document.getElementById('attachment-input').click()"
-                                class="text-[#52525b] hover:text-white transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
-                                    </path>
-                                </svg>
-                            </button>
-
-                            <!-- Simple file preview badge -->
-                            <div x-show="fileName"
-                                class="absolute bottom-full left-0 mb-2 bg-[#202024] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg"
-                                style="display: none;">
-                                <span class="text-xs text-white truncate max-w-[150px]" x-text="fileName"></span>
-                                <button type="button" @click="removeFile"
-                                    class="text-[#71717a] hover:text-red-500 transition-colors">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
+                        }">
+                        <fieldset class="contents" :disabled="!isUnlocked || isUploading">
+                            <div>
+                                <input type="file" id="attachment-input" class="hidden" @change="handleFile" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt">
+                                <button type="button" @click="document.getElementById('attachment-input').click()"
+                                    class="text-[#52525b] hover:text-white transition-colors p-2 hover:bg-white/5 rounded-xl">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M6 18L18 6M6 6l12 12"></path>
+                                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                                        </path>
                                     </svg>
                                 </button>
+
+                                <!-- File preview badge with upload progress -->
+                                <div x-show="fileName"
+                                    class="absolute bottom-full left-0 mb-3 bg-[#202024] border border-white/10 rounded-2xl p-3 flex flex-col gap-2 shadow-2xl min-w-[220px]"
+                                    style="display: none;">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div class="flex items-center gap-2 overflow-hidden">
+                                            <div class="w-7 h-7 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-500 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                                            </div>
+                                            <div class="overflow-hidden">
+                                                <p class="text-xs text-white font-medium truncate max-w-[140px]" x-text="fileName"></p>
+                                                <p class="text-[10px] text-[#71717a]" x-text="fileSize"></p>
+                                            </div>
+                                        </div>
+                                        <button type="button" @click="removeFile"
+                                            class="text-[#71717a] hover:text-red-500 transition-colors p-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div x-show="isUploading" class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                        <div class="bg-pink-500 h-full transition-all duration-300" :style="'width: ' + uploadProgress + '%'"></div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
-                            class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
-                            autocomplete="off">
+                            <input type="text" x-model="localBody" placeholder="Message {{ $selInfo['name'] }}..."
+                                class="flex-1 bg-[#202024] text-white text-[13px] px-4 py-3 rounded-xl border border-white/5 focus:outline-none focus:border-pink-500/50 transition-colors placeholder:text-[#52525b]"
+                                autocomplete="off">
 
-                        <button type="submit"
-                            class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-                            wire:loading.attr="disabled">
-                            <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                            </svg>
-                        </button>
-                    </fieldset>
-                </form>
-            </div>
-            {{-- end isSelf footer check --}}
+                            <button type="submit"
+                                class="bg-pink-500 hover:bg-pink-600 text-white p-2.5 rounded-xl transition-all shadow-[0_0_10px_rgba(236,72,153,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                :disabled="isUploading">
+                                <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                                </svg>
+                            </button>
+                        </fieldset>
+                    </form>
+                </div>
+            @endif
+            {{-- end isSelf / blocked footer check --}}
         @else
             <div class="flex-1 flex items-center justify-center relative">
                 <button x-show="isSidebarCollapsed" @click="toggleSidebar()"

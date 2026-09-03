@@ -154,6 +154,126 @@ class EncryptionService {
 
         return await this.decryptMessage(encBody, nonce, encKeyForMe, publicKey, privateKey);
     }
+
+    /**
+     * Encrypt a file binary buffer for one or more recipients
+     * @param {ArrayBuffer|Uint8Array} fileBuffer
+     * @param {Object} recipientPublicKeys - {userId: publicKeyBase64}
+     * @returns {Promise<{encBlobBase64: string, nonce: string, keys: Object}>}
+     */
+    async encryptFile(fileBuffer, recipientPublicKeys) {
+        await this.init();
+
+        const uint8Data = fileBuffer instanceof Uint8Array ? fileBuffer : new Uint8Array(fileBuffer);
+
+        // Generate a random symmetric key & nonce
+        const fileKey = this.sodium.randombytes_buf(this.sodium.crypto_secretbox_KEYBYTES);
+        const nonce = this.sodium.randombytes_buf(this.sodium.crypto_secretbox_NONCEBYTES);
+
+        // Encrypt the file data
+        const encData = this.sodium.crypto_secretbox_easy(uint8Data, nonce, fileKey);
+
+        // Encrypt the symmetric key for each recipient
+        const encryptedKeys = {};
+        for (const [userId, publicKeyBase64] of Object.entries(recipientPublicKeys)) {
+            const publicKey = this.sodium.from_base64(publicKeyBase64);
+            const encKey = this.sodium.crypto_box_seal(fileKey, publicKey);
+            encryptedKeys[userId] = this.sodium.to_base64(encKey);
+        }
+
+        return {
+            encBlobBase64: this.sodium.to_base64(encData),
+            nonce: this.sodium.to_base64(nonce),
+            keys: encryptedKeys
+        };
+    }
+
+    /**
+     * Decrypt a file binary buffer
+     * @param {string|Uint8Array} encData 
+     * @param {string} nonceBase64 
+     * @param {string} encKeyForMeBase64 
+     * @param {string} myPublicKeyBase64 
+     * @param {string} myPrivateKeyBase64 
+     * @returns {Promise<Uint8Array>}
+     */
+    async decryptFile(encData, nonceBase64, encKeyForMeBase64, myPublicKeyBase64, myPrivateKeyBase64) {
+        await this.init();
+
+        const myPublicKey = this.sodium.from_base64(myPublicKeyBase64);
+        const myPrivateKey = this.sodium.from_base64(myPrivateKeyBase64);
+        const encKeyForMe = this.sodium.from_base64(encKeyForMeBase64);
+
+        // Decrypt the symmetric key
+        const fileKey = this.sodium.crypto_box_seal_open(encKeyForMe, myPublicKey, myPrivateKey);
+
+        const encBytes = typeof encData === 'string' ? this.sodium.from_base64(encData) : encData;
+        const nonce = this.sodium.from_base64(nonceBase64);
+        const decryptedData = this.sodium.crypto_secretbox_open_easy(encBytes, nonce, fileKey);
+
+        if (!decryptedData) {
+            throw new Error("File decryption failed");
+        }
+
+        return decryptedData;
+    }
+
+    /**
+     * Helper to decrypt an attachment and create an ObjectURL
+     * @param {Object} attachment
+     * @param {string|Object} userId
+     * @returns {Promise<string>}
+     */
+    async decryptAttachmentForMe(attachment, userId) {
+        if (!attachment || !attachment.encryption_metadata) return attachment.url || '';
+
+        const meta = attachment.encryption_metadata;
+        const uid = (typeof userId === 'object' && userId !== null && userId.$oid)
+            ? userId.$oid
+            : String(userId);
+
+        let privateKey = sessionStorage.getItem('e2e_private_' + uid);
+        let publicKey = sessionStorage.getItem('e2e_public_' + uid);
+
+        if (!privateKey || !publicKey) {
+            const mnemonic = localStorage.getItem('e2e_recovery_' + uid);
+            if (mnemonic) {
+                try {
+                    const keyPair = await this.deriveKeyPair(mnemonic);
+                    sessionStorage.setItem('e2e_private_' + uid, keyPair.privateKey);
+                    sessionStorage.setItem('e2e_public_' + uid, keyPair.publicKey);
+                    privateKey = keyPair.privateKey;
+                    publicKey = keyPair.publicKey;
+                } catch (e) {
+                    console.error('E2E: Auto key recovery failed during attachment decryption:', e);
+                }
+            }
+        }
+
+        let encKeyForMe = meta.enc_keys?.[uid];
+        if (!encKeyForMe && meta.enc_keys) {
+            for (const [k, v] of Object.entries(meta.enc_keys)) {
+                if (String(k) === String(uid)) {
+                    encKeyForMe = v;
+                    break;
+                }
+            }
+        }
+
+        const nonce = meta.nonce;
+        if (!privateKey || !publicKey || !encKeyForMe || !nonce) {
+            throw new Error("Missing keys to decrypt attachment");
+        }
+
+        // Fetch the raw ciphertext blob from server/MinIO
+        const downloadUrl = attachment.url || ('/storage/' + attachment.storage_path);
+        const response = await fetch(downloadUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const decryptedBytes = await this.decryptFile(new Uint8Array(arrayBuffer), nonce, encKeyForMe, publicKey, privateKey);
+
+        const blob = new Blob([decryptedBytes], { type: attachment.mime_type || 'application/octet-stream' });
+        return URL.createObjectURL(blob);
+    }
 }
 
 window.EncryptionService = new EncryptionService();

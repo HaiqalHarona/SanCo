@@ -20,6 +20,12 @@ trait FriendActions
         return app(FriendshipService::class)->getFriends(auth()->id());
     }
 
+    #[Computed]
+    public function blockedContacts()
+    {
+        return app(FriendshipService::class)->getBlockedUsers(auth()->id());
+    }
+
     public function searchContact()
     {
         $this->reset(['searchResult']);
@@ -63,6 +69,7 @@ trait FriendActions
     public function reloadContacts($notifyUser = null)
     {
         unset($this->contacts);
+        unset($this->blockedContacts);
         unset($this->preloadChatList);
 
         if ($notifyUser) {
@@ -75,6 +82,8 @@ trait FriendActions
         try {
             app(FriendshipService::class)->unfriend(auth()->id(), $friendId);
             $this->selectedConversationId = null;
+            unset($this->contacts);
+            unset($this->preloadChatList);
             session()->flash('success', 'Friend removed.');
         } catch (\Exception $e) {
             session()->flash('error', $e->getMessage());
@@ -86,7 +95,11 @@ trait FriendActions
         try {
             app(FriendshipService::class)->blockUser(auth()->id(), $friendId);
             $this->selectedConversationId = null;
+            unset($this->contacts);
+            unset($this->blockedContacts);
+            unset($this->preloadChatList);
             session()->flash('success', 'User blocked.');
+            $this->dispatch('contact-blocked');
         } catch (\Exception $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -96,7 +109,11 @@ trait FriendActions
     {
         try {
             app(FriendshipService::class)->unblockUser(auth()->id(), $friendId);
+            unset($this->contacts);
+            unset($this->blockedContacts);
+            unset($this->preloadChatList);
             session()->flash('success', 'User unblocked.');
+            $this->dispatch('contact-unblocked');
         } catch (\Exception $e) {
             session()->flash('error', $e->getMessage());
         }

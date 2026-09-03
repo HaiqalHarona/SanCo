@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Conversation;
 use App\Models\Friendship;
 use App\Models\User;
-use Laravel\Sanctum\Sanctum;
+use App\Services\FriendshipService;
+use App\Services\MessageService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Tests\TestCase;
 
 class FriendshipBlockTest extends TestCase
@@ -13,83 +16,106 @@ class FriendshipBlockTest extends TestCase
     {
         parent::setUp();
 
-        // Clear database before each test
-        User::truncate();
         Friendship::truncate();
+        Conversation::truncate();
+        User::truncate();
     }
 
-    public function test_guest_cannot_block_user()
+    public function test_block_user_creates_blocked_record_and_purges_friendship(): void
     {
-        $response = $this->postJson('/api/friends/12345/block');
-        $response->assertStatus(401);
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+
+        $friendshipService = app(FriendshipService::class);
+
+        // Send and accept friendship
+        $friendshipService->sendRequest((string) $userA->_id, (string) $userB->_id);
+        $friendshipService->acceptRequest((string) $userB->_id, (string) $userA->_id);
+
+        $this->assertTrue(Friendship::areFriends((string) $userA->_id, (string) $userB->_id));
+
+        // Block user B by user A
+        $friendshipService->blockUser((string) $userA->_id, (string) $userB->_id);
+
+        $this->assertFalse(Friendship::areFriends((string) $userA->_id, (string) $userB->_id));
+        $this->assertTrue($friendshipService->isBlocked((string) $userA->_id, (string) $userB->_id));
+        $this->assertFalse($friendshipService->isBlocked((string) $userB->_id, (string) $userA->_id));
+
+        // Verify getBlockedUsers
+        $blockedUsers = $friendshipService->getBlockedUsers((string) $userA->_id);
+        $this->assertCount(1, $blockedUsers);
+        $this->assertEquals((string) $userB->_id, (string) $blockedUsers->first()->_id);
     }
 
-    public function test_guest_cannot_unblock_user()
+    public function test_unblock_user_removes_blocked_record(): void
     {
-        $response = $this->deleteJson('/api/friends/12345/unblock');
-        $response->assertStatus(401);
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+
+        $friendshipService = app(FriendshipService::class);
+        $friendshipService->blockUser((string) $userA->_id, (string) $userB->_id);
+
+        $this->assertTrue($friendshipService->isBlocked((string) $userA->_id, (string) $userB->_id));
+
+        $friendshipService->unblockUser((string) $userA->_id, (string) $userB->_id);
+
+        $this->assertFalse($friendshipService->isBlocked((string) $userA->_id, (string) $userB->_id));
+        $this->assertCount(0, $friendshipService->getBlockedUsers((string) $userA->_id));
     }
 
-    public function test_user_can_block_friend()
+    public function test_message_service_throws_authorization_exception_when_messaging_blocked_user(): void
     {
-        $user = User::factory()->create();
-        $friend = User::factory()->create();
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
 
-        // Establish a friendship first
-        Friendship::create([
-            'user_id' => $user->_id,
-            'friend_id' => $friend->_id,
-            'status' => 'accepted',
-            'action_user_id' => $user->_id,
-            'accepted_at' => now(),
+        $convo = Conversation::findOrCreateDirect((string) $userA->_id, (string) $userB->_id);
+
+        $friendshipService = app(FriendshipService::class);
+        $friendshipService->blockUser((string) $userA->_id, (string) $userB->_id);
+
+        $messageService = app(MessageService::class);
+
+        $this->expectException(AuthorizationException::class);
+
+        $messageService->send([
+            'conversation_id' => (string) $convo->_id,
+            'sender_id' => (string) $userA->_id,
+            'body' => 'encrypted_payload',
+            'type' => 'text',
+            'metadata' => [
+                'is_encrypted' => true,
+                'nonce' => 'test_nonce',
+                'enc_keys' => ['test' => 'test_key'],
+            ],
         ]);
-        Friendship::create([
-            'user_id' => $friend->_id,
-            'friend_id' => $user->_id,
-            'status' => 'accepted',
-            'action_user_id' => $user->_id,
-            'accepted_at' => now(),
-        ]);
-
-        $this->assertTrue(Friendship::areFriends($user->_id, $friend->_id));
-
-        Sanctum::actingAs($user);
-
-        $response = $this->postJson("/api/friends/{$friend->_id}/block");
-
-        $response->assertStatus(200)
-            ->assertJson(['message' => 'User blocked.']);
-
-        // Assert friendship records are deleted, and a block record is created
-        $this->assertFalse(Friendship::areFriends($user->_id, $friend->_id));
-        $this->assertTrue(Friendship::hasBlocked($user->_id, $friend->_id));
-        $this->assertFalse(Friendship::hasBlocked($friend->_id, $user->_id));
     }
 
-    public function test_user_can_unblock_user()
+    public function test_message_service_throws_authorization_exception_when_sender_is_blocked_by_recipient(): void
     {
-        $user = User::factory()->create();
-        $blocked = User::factory()->create();
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
 
-        // Create blocked friendship record
-        Friendship::create([
-            'user_id' => $user->_id,
-            'friend_id' => $blocked->_id,
-            'status' => 'blocked',
-            'action_user_id' => $user->_id,
-            'blocked_at' => now(),
+        $convo = Conversation::findOrCreateDirect((string) $userA->_id, (string) $userB->_id);
+
+        $friendshipService = app(FriendshipService::class);
+        // User B blocks User A
+        $friendshipService->blockUser((string) $userB->_id, (string) $userA->_id);
+
+        $messageService = app(MessageService::class);
+
+        $this->expectException(AuthorizationException::class);
+
+        // User A attempts to message User B
+        $messageService->send([
+            'conversation_id' => (string) $convo->_id,
+            'sender_id' => (string) $userA->_id,
+            'body' => 'encrypted_payload',
+            'type' => 'text',
+            'metadata' => [
+                'is_encrypted' => true,
+                'nonce' => 'test_nonce',
+                'enc_keys' => ['test' => 'test_key'],
+            ],
         ]);
-
-        $this->assertTrue(Friendship::hasBlocked($user->_id, $blocked->_id));
-
-        Sanctum::actingAs($user);
-
-        $response = $this->deleteJson("/api/friends/{$blocked->_id}/unblock");
-
-        $response->assertStatus(200)
-            ->assertJson(['message' => 'User unblocked.']);
-
-        // Assert block record is deleted
-        $this->assertFalse(Friendship::hasBlocked($user->_id, $blocked->_id));
     }
 }

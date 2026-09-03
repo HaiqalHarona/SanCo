@@ -54,6 +54,24 @@ class FriendshipService
         });
     }
 
+    public function getBlockedUsers(string $userId): Collection
+    {
+        $userIdStr = (string) $userId;
+
+        return Cache::remember("sanco:user:{$userIdStr}:blocked_users", now()->addHours(12), function () use ($userIdStr) {
+            $blockedFriendships = Friendship::where('user_id', $userIdStr)
+                ->where('status', 'blocked')
+                ->get();
+
+            $blockedIds = $blockedFriendships->pluck('friend_id')
+                ->map(fn ($id) => (string) $id)
+                ->unique()
+                ->values();
+
+            return User::whereIn('_id', $blockedIds)->get();
+        });
+    }
+
     public function isBlocked(string $userA, string $userB): bool
     {
         $blocks = Cache::remember("sanco:user:{$userA}:blocks", now()->addHours(24), function () use ($userA) {
@@ -122,6 +140,10 @@ class FriendshipService
         Cache::forget("sanco:user:{$blockedId}:friends");
         Cache::forget("sanco:user:{$blockerId}:blocks");
         Cache::forget("sanco:user:{$blockedId}:blocks");
+        Cache::forget("sanco:user:{$blockerId}:blocked_users");
+        Cache::forget("sanco:user:{$blockedId}:blocked_users");
+        Cache::forget("sanco:user:{$blockerId}:inbox");
+        Cache::forget("sanco:user:{$blockedId}:inbox");
     }
 
     public function unblockUser(string $blockerId, string $blockedId): void
@@ -129,5 +151,7 @@ class FriendshipService
         Friendship::unblockUser($blockerId, $blockedId);
 
         Cache::forget("sanco:user:{$blockerId}:blocks");
+        Cache::forget("sanco:user:{$blockerId}:blocked_users");
+        Cache::forget("sanco:user:{$blockerId}:inbox");
     }
 }

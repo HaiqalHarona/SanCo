@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 
@@ -54,6 +55,27 @@ class MessageService
             if (! $isEncrypted || empty($nonce) || empty($encKeys)) {
                 throw new \InvalidArgumentException('Message body must be end-to-end encrypted (E2EE). Plaintext is rejected.');
             }
+
+            // Enforce contact blocking
+            $convo = Conversation::find($data['conversation_id']);
+            if ($convo) {
+                $friendshipService = app(FriendshipService::class);
+                $senderId = (string) $data['sender_id'];
+
+                foreach ($convo->participant_ids as $pid) {
+                    $pidStr = (string) $pid;
+                    if ($pidStr === $senderId) {
+                        continue;
+                    }
+
+                    if ($friendshipService->isBlocked($pidStr, $senderId)) {
+                        throw new AuthorizationException('You cannot message this user because you have been blocked.');
+                    }
+                    if ($friendshipService->isBlocked($senderId, $pidStr)) {
+                        throw new AuthorizationException('You cannot message this user because you have blocked them.');
+                    }
+                }
+            }
         }
 
         $message = Message::create([
@@ -70,6 +92,13 @@ class MessageService
             'reply_to_id' => $data['reply_to_id'] ?? null,
             'metadata' => $data['metadata'] ?? [],
         ]);
+
+        // Attach any embedded attachments
+        if (! empty($data['attachments']) && is_array($data['attachments'])) {
+            foreach ($data['attachments'] as $attachmentData) {
+                $message->attachments()->create($attachmentData);
+            }
+        }
 
         // Update the conversation's last activity
         Conversation::where('_id', $data['conversation_id'])->update([

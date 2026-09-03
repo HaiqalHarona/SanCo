@@ -19,10 +19,12 @@ class Attachment extends Model
         'file_size',       // bytes
         'mime_type',
         'url',
+        'storage_path',
         'thumbnail_url',
         'duration',        // seconds, for audio/video
         'width',           // px, for images/video
         'height',
+        'encryption_metadata',
     ];
 
     protected $casts = [
@@ -30,6 +32,7 @@ class Attachment extends Model
         'duration' => 'integer',
         'width' => 'integer',
         'height' => 'integer',
+        'encryption_metadata' => 'array',
     ];
 
     // ── Helpers ────────────────────────────────────────────────
